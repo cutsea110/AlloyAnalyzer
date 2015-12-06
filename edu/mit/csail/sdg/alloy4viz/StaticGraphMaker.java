@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
 import javax.swing.JPanel;
+
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4graph.DotColor;
@@ -31,8 +33,8 @@ import edu.mit.csail.sdg.alloy4graph.DotDirection;
 import edu.mit.csail.sdg.alloy4graph.DotPalette;
 import edu.mit.csail.sdg.alloy4graph.DotShape;
 import edu.mit.csail.sdg.alloy4graph.DotStyle;
-import edu.mit.csail.sdg.alloy4graph.GraphEdge;
 import edu.mit.csail.sdg.alloy4graph.Graph;
+import edu.mit.csail.sdg.alloy4graph.GraphEdge;
 import edu.mit.csail.sdg.alloy4graph.GraphNode;
 import edu.mit.csail.sdg.alloy4graph.GraphViewer;
 

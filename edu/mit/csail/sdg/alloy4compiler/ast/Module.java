@@ -18,16 +18,14 @@ package edu.mit.csail.sdg.alloy4compiler.ast;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
+
 import javax.swing.JFrame;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.Listener;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.SafeList;
-import edu.mit.csail.sdg.alloy4compiler.ast.Command;
-import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
-import edu.mit.csail.sdg.alloy4compiler.ast.Func;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 
 /** This interface represents an Alloy module. */
 
@@ -50,7 +48,7 @@ public interface Module {
 
    /** Return the list containing all sigs defined in this module or a reachable submodule. */
    public ConstList<Sig> getAllReachableUserDefinedSigs();
-   
+
    /** Returns an unmodifiable list of all signatures defined inside this module. */
    public SafeList<Sig> getAllSigs();
 
@@ -71,7 +69,7 @@ public interface Module {
 
    /** Add a global expression; if the name already exists, it is removed first. */
    public void addGlobal(String name, Expr value);
-   
+
    /** Display this object (and so objects) as a tree; if listener!=null, it will receive OurTree.Event.SELECT events. */
    public JFrame showAsTree(Listener listener);
 

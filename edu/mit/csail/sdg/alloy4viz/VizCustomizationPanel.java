@@ -28,6 +28,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.swing.BoxLayout;
 import javax.swing.Icon;
 import javax.swing.JComboBox;
@@ -42,10 +43,11 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.tree.TreePath;
+
 import edu.mit.csail.sdg.alloy4.Listener;
 import edu.mit.csail.sdg.alloy4.OurBorder;
-import edu.mit.csail.sdg.alloy4.OurCombobox;
 import edu.mit.csail.sdg.alloy4.OurCheckbox;
+import edu.mit.csail.sdg.alloy4.OurCombobox;
 import edu.mit.csail.sdg.alloy4.OurTree;
 import edu.mit.csail.sdg.alloy4.OurUtil;
 import edu.mit.csail.sdg.alloy4.Util;

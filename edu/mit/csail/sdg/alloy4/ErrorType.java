@@ -38,6 +38,7 @@ public final class ErrorType extends Err {
     * @param msg - the actual error message (can be null)
     */
    public ErrorType(Pos pos, String msg) { super(pos, msg, null); }
+   public ErrorType(Pos pos, String msg, Throwable e) { super(pos, msg, e); }
 
    /** Returns a textual description of the error. */
    @Override public String toString() {

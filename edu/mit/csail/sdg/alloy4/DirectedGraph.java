@@ -15,10 +15,10 @@
 
 package edu.mit.csail.sdg.alloy4;
 
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 
 /** Mutable; implements a directed graph; null node is allowed.
  *

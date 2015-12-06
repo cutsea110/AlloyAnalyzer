@@ -2,39 +2,50 @@ package tmp;
 
 import java.util.Arrays;
 import java.util.List;
-import kodkod.ast.*;
-import kodkod.ast.operator.*;
-import kodkod.instance.*;
-import kodkod.engine.*;
-import kodkod.engine.satlab.SATFactory;
-import kodkod.engine.config.Options;
 
-/* 
+import kodkod.ast.Decls;
+import kodkod.ast.Expression;
+import kodkod.ast.Formula;
+import kodkod.ast.IntConstant;
+import kodkod.ast.IntExpression;
+import kodkod.ast.Relation;
+import kodkod.ast.Variable;
+import kodkod.ast.operator.FormulaOperator;
+import kodkod.engine.Solution;
+import kodkod.engine.Solver;
+import kodkod.engine.config.Options;
+import kodkod.engine.satlab.SATFactory;
+import kodkod.instance.Bounds;
+import kodkod.instance.TupleFactory;
+import kodkod.instance.TupleSet;
+import kodkod.instance.Universe;
+
+/*
 ==================================================
-  kodkod formula: 
+  kodkod formula:
 ==================================================
-  (all XRun_this: this/AddBX | 
-    (XRun_this . this/AddBX.addr) in (this/Book -> this/Name -> this/Addr) && 
-    (all v20: project[this/Book -> this/Name, <0>], v19: project[this/Book -> 
-     this/Name, <1>] | 
-      (v19 -> v20) in (this/Book -> this/Name) => 
-      (lone (v20 . (v19 . (XRun_this . this/AddBX.addr))) && 
-       (v20 . (v19 . (XRun_this . this/AddBX.addr))) in this/Addr)) && 
-    (all v21: this/Addr | 
-      ((XRun_this . this/AddBX.addr) . v21) in (this/Book -> this/Name))) && 
-  (((this/AddBX.addr . univ) . univ) . univ) in this/AddBX && 
-  (some XRun_B: this/Book, XRun_N: this/Name, XRun_X: this/AddBX | 
-    #(XRun_N . (XRun_B . (XRun_X . this/AddBX.addr))) = 2) && 
-  Int/min = Int/min && 
-  Int/zero = Int/zero && 
-  Int/max = Int/max && 
-  Int/next = Int/next && 
-  seq/Int = seq/Int && 
-  String = String && 
-  this/Book = this/Book && 
-  this/Name = this/Name && 
-  this/Addr = this/Addr && 
-  this/AddBX = this/AddBX && 
+  (all XRun_this: this/AddBX |
+    (XRun_this . this/AddBX.addr) in (this/Book -> this/Name -> this/Addr) &&
+    (all v20: project[this/Book -> this/Name, <0>], v19: project[this/Book ->
+     this/Name, <1>] |
+      (v19 -> v20) in (this/Book -> this/Name) =>
+      (lone (v20 . (v19 . (XRun_this . this/AddBX.addr))) &&
+       (v20 . (v19 . (XRun_this . this/AddBX.addr))) in this/Addr)) &&
+    (all v21: this/Addr |
+      ((XRun_this . this/AddBX.addr) . v21) in (this/Book -> this/Name))) &&
+  (((this/AddBX.addr . univ) . univ) . univ) in this/AddBX &&
+  (some XRun_B: this/Book, XRun_N: this/Name, XRun_X: this/AddBX |
+    #(XRun_N . (XRun_B . (XRun_X . this/AddBX.addr))) = 2) &&
+  Int/min = Int/min &&
+  Int/zero = Int/zero &&
+  Int/max = Int/max &&
+  Int/next = Int/next &&
+  seq/Int = seq/Int &&
+  String = String &&
+  this/Book = this/Book &&
+  this/Name = this/Name &&
+  this/Addr = this/Addr &&
+  this/AddBX = this/AddBX &&
   this/AddBX.addr = this/AddBX.addr
 ==================================================
 */

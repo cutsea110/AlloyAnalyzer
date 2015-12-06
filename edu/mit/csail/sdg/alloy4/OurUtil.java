@@ -303,7 +303,8 @@ public final class OurUtil {
             if (k < 0) continue;
             if (k==KeyEvent.VK_ALT)   { hasMnemonic = true; accelMask = accelMask | InputEvent.ALT_MASK;   continue; }
             if (k==KeyEvent.VK_SHIFT) { hasMnemonic = true; accelMask = accelMask | InputEvent.SHIFT_MASK; continue; }
-            if (!hasMnemonic) { m.setMnemonic(k); hasMnemonic=true; } else m.setAccelerator(KeyStroke.getKeyStroke(k, accelMask));
+            if (!hasMnemonic) {
+                m.setMnemonic(k); hasMnemonic=true; } else m.setAccelerator(KeyStroke.getKeyStroke(k, accelMask));
          }
          if (x instanceof ActionListener) m.addActionListener((ActionListener)x);
          if (x instanceof Icon) m.setIcon((Icon)x);
@@ -312,7 +313,7 @@ public final class OurUtil {
       if (parent!=null) parent.add(m);
       return m;
    }
-   
+
    /** This method minimizes the window. */
    public static void minimize(JFrame frame) { frame.setExtendedState(JFrame.ICONIFIED); }
 
@@ -349,58 +350,58 @@ public final class OurUtil {
    public static class GridBagConstraintsBuilder {
       private final GridBagConstraints gbc;
 
-      /** Constructor */ 
+      /** Constructor */
       public GridBagConstraintsBuilder() { this.gbc = new GridBagConstraints(); }
-      
+
       /** Returns the built GridBagConstraints instance */
       public GridBagConstraints make() { return this.gbc; }
-      
-      /** @see GridBagConstraints#anchor} */     
+
+      /** @see GridBagConstraints#anchor} */
       public GridBagConstraintsBuilder anchor(int a)     { gbc.anchor = a; return this; }
-      /** @see GridBagConstraints#fill */       
+      /** @see GridBagConstraints#fill */
       public GridBagConstraintsBuilder fill(int a)       { gbc.fill = a; return this; }
-      /** @see GridBagConstraints#gridheight */ 
+      /** @see GridBagConstraints#gridheight */
       public GridBagConstraintsBuilder gridheight(int a) { gbc.gridheight = a; return this; }
-      /** @see GridBagConstraints#gridwidth */  
+      /** @see GridBagConstraints#gridwidth */
       public GridBagConstraintsBuilder gridwidth(int a)  { gbc.gridwidth = a; return this; }
-      /** @see GridBagConstraints#gridx */      
+      /** @see GridBagConstraints#gridx */
       public GridBagConstraintsBuilder gridx(int a)      { gbc.gridx = a; return this; }
-      /** @see GridBagConstraints#gridy */      
+      /** @see GridBagConstraints#gridy */
       public GridBagConstraintsBuilder gridy(int a)      { gbc.gridy = a; return this; }
-      /** @see GridBagConstraints#insets */     
+      /** @see GridBagConstraints#insets */
       public GridBagConstraintsBuilder insets(Insets a)  { gbc.insets = a; return this; }
-      /** @see GridBagConstraints#ipadx */      
+      /** @see GridBagConstraints#ipadx */
       public GridBagConstraintsBuilder ipadx(int a)      { gbc.ipadx = a; return this; }
-      /** @see GridBagConstraints#ipady */      
+      /** @see GridBagConstraints#ipady */
       public GridBagConstraintsBuilder ipady(int a)      { gbc.ipady = a; return this; }
-      /** @see GridBagConstraints#weightx */    
+      /** @see GridBagConstraints#weightx */
       public GridBagConstraintsBuilder weightx(int a)    { gbc.weightx = a; return this; }
-      /** @see GridBagConstraints#weighty */    
+      /** @see GridBagConstraints#weighty */
       public GridBagConstraintsBuilder weighty(int a)    { gbc.weighty = a; return this; }
-      
+
       /**
        * Applies gridx(x).gridy(y)
-       * 
+       *
        * @see GridBagConstraints#gridx
        * @see GridBagConstraints#gridy
-       */        
+       */
       public GridBagConstraintsBuilder pos(int x, int y)     { return gridx(x).gridy(y); }
-      
-      
-      /** 
+
+
+      /**
        * Applies weightx(x).weighty(y)
-       * 
-       * @see GridBagConstraints#weightx 
+       *
+       * @see GridBagConstraints#weightx
        * @see GridBagConstraints#weighty
-       */    
+       */
       public GridBagConstraintsBuilder weights(int x, int y) { return weightx(x).weighty(y); }
-      
-      /** 
+
+      /**
        * Applies ipadx(x).ipday(y)
-       * 
-       * @see GridBagConstraints#ipadx 
+       *
+       * @see GridBagConstraints#ipadx
        * @see GridBagConstraints#ipady
-       */    
+       */
       public GridBagConstraintsBuilder ipads(int x, int y)   { return ipadx(x).ipady(y); }
    }
 }

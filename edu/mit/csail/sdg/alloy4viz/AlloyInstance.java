@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 

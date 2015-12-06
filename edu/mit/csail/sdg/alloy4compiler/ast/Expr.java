@@ -107,7 +107,7 @@ public abstract class Expr extends Browsable {
       this.closingBracket = (closingBracket==null ? Pos.UNKNOWN : closingBracket);
       this.ambiguous      = ambiguous;
       if (errors==null) errors = emptyListOfErrors;
-      if (type==EMPTY && errors.size()==0) 
+      if (type==EMPTY && errors.size()==0)
           errors = errors.make(new ErrorType(pos, "This expression failed to be typechecked"));
       this.mult   = (mult<0 || mult>2) ? 0 : mult;
       this.type   = (errors.size()>0 || type==null) ? EMPTY : type;
@@ -177,7 +177,7 @@ public abstract class Expr extends Browsable {
           return cast2sigint();
       if (type.is_int())
           return this;
-      if (type.size()>0) 
+      if (type.size()>0)
           return this;
       // else: error
       String msg = "This must be a set or relation.\nInstead, it has the following possible type(s):\n"+type;
@@ -550,66 +550,73 @@ public abstract class Expr extends Browsable {
    /** Returns the formula (all...| this)
     * <p> this must be a formula
     */
-   public final Expr forAll(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr forAll(Decl firstDecl, Decl... moreDecls) throws Err           { return forAll(null, firstDecl, moreDecls); }
+   public final Expr forAll(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.ALL.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.ALL.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the formula (no...| this)
     * <p> this must be a formula
     */
-   public final Expr forNo(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr forNo(Decl firstDecl, Decl... moreDecls) throws Err           { return forNo(null, firstDecl, moreDecls); }
+   public final Expr forNo(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.NO.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.NO.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the formula (lone...| this)
     * <p> this must be a formula
     */
-   public final Expr forLone(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr forLone(Decl firstDecl, Decl... moreDecls) throws Err           { return forLone(null, firstDecl, moreDecls); }
+   public final Expr forLone(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.LONE.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.LONE.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the formula (one ...| this)
     * <p> this must be a formula
     */
-   public final Expr forOne(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr forOne(Decl firstDecl, Decl... moreDecls) throws Err           { return forOne(null, firstDecl, moreDecls); }
+   public final Expr forOne(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.ONE.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.ONE.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the formula (some...| this)
     * <p> this must be a formula
     */
-   public final Expr forSome(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr forSome(Decl firstDecl, Decl... moreDecls) throws Err           { return forSome(null, firstDecl, moreDecls); }
+   public final Expr forSome(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.SOME.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.SOME.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the comprehension expression {...|this}
     * <p> this must be a formula
     * <p> each declaration must be a "one-of" quantification over a unary set
     */
-   public final Expr comprehensionOver(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr comprehensionOver(Decl firstDecl, Decl... moreDecls) throws Err           { return comprehensionOver(null, firstDecl, moreDecls); }
+   public final Expr comprehensionOver(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.COMPREHENSION.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.COMPREHENSION.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Returns the integer (sum...| this)
     * <p> this must be an integer expression
     * <p> each declaration must be a "one-of" quantification over a unary set
     */
-   public final Expr sumOver(Decl firstDecl, Decl... moreDecls) throws Err {
+   public final Expr sumOver(Decl firstDecl, Decl... moreDecls) throws Err           { return sumOver(null, firstDecl, moreDecls); }
+   public final Expr sumOver(Expr dom, Decl firstDecl, Decl... moreDecls) throws Err {
       Pos p = firstDecl.span();
       for(Decl v: moreDecls) p=p.merge(v.span());
-      return ExprQt.Op.SUM.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), this);
+      return ExprQt.Op.SUM.make(p, null, Util.prepend(Util.asList(moreDecls), firstDecl), dom, this);
    }
 
    /** Return the multiplicity expression "some this"
@@ -734,4 +741,5 @@ public abstract class Expr extends Browsable {
     * <p> this must be an integer expression
     */
    public final Expr cast2sigint() { return ExprUnary.Op.CAST2SIGINT.make(span(), this); }
+
 }

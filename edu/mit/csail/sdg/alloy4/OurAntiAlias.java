@@ -19,6 +19,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.util.WeakHashMap;
+
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JTextPane;

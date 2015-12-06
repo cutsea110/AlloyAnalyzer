@@ -55,11 +55,11 @@ public final class AlloyAtom implements Comparable<AlloyAtom> {
             // Special handling for Meta Model. (Only meta model could have index==MIN_VALUE)
             return "seq/Int";
          }
-         if (index==Integer.MAX_VALUE || !numberAtoms) return theme.label.get(type); else return theme.label.get(type)+index;
+         if (index==Integer.MAX_VALUE || !numberAtoms) return originalName; else return theme.label.get(type)+index;
       }
       if (type.getName().equals("Int")) return ""+index; // Special override to display integers better
       if (type.getName().equals("seq/Int")) return ""+index; // Special override to display integers better
-      if (index==Integer.MAX_VALUE || !numberAtoms) return type.getName(); else return type.getName()+index;
+      if (index==Integer.MAX_VALUE || !numberAtoms) return originalName; else return type.getName()+index;
    }
 
    /** Return the type of the AlloyAtom. */

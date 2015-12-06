@@ -15,13 +15,15 @@
 
 package edu.mit.csail.sdg.alloy4compiler.ast;
 
+import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.UNIV;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.Pos;
+
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.UNIV;
+import edu.mit.csail.sdg.alloy4.Pos;
 
 /** Immutable; represents a constant in the AST. */
 
@@ -77,6 +79,11 @@ public final class ExprConstant extends Expr {
         if (!(obj instanceof ExprConstant)) return false;
         ExprConstant x=(ExprConstant)obj;
         if (op==Op.STRING) return op==x.op && string.equals(x.string); else return op==x.op && num==x.num;
+    }
+
+    public ExprConstant neg() {
+        if (op != Op.NUMBER) return this;
+        return (ExprConstant) makeNUMBER(-num);
     }
 
     /** The "TRUE" boolean value. */
@@ -159,14 +166,15 @@ public final class ExprConstant extends Expr {
     /** {@inheritDoc} */
     @Override public String getHTML() {
         switch(op) {
-          case TRUE: return "<b>true</b>";
-          case FALSE: return "<b>false</b>";
-          case IDEN: return "<b>iden</b>";
-          case MAX: return "<b>fun/max</b>";
-          case MIN: return "<b>fun/min</b>";
-          case NEXT: return "<b>fun/next</b>";
+          case TRUE:      return "<b>true</b>";
+          case FALSE:     return "<b>false</b>";
+          case IDEN:      return "<b>iden</b>";
+          case MAX:       return "<b>fun/max</b>";
+          case MIN:       return "<b>fun/min</b>";
+          case NEXT:      return "<b>fun/next</b>";
           case EMPTYNESS: return "<b>none</b>";
-          case STRING: return "<b>\"" + string + "\"</b>";
+          case STRING:    return "<b>\"" + string + "\"</b>";
+          case NUMBER:    return "<b>" + num + "</b>";
         }
         return "<b>" + num + "</b>";
     }

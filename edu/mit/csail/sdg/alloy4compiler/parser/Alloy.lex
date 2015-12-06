@@ -96,15 +96,29 @@ import java_cup.runtime.*;
     if (alloy_seenDollar.size()==0 && txt.indexOf('$')>=0) alloy_seenDollar.add(null);
     return new Symbol(CompSym.ID, p, ExprVar.make(p,txt));
  }
+ private static final long maxint = new java.math.BigInteger(Integer.toString(Integer.MAX_VALUE), 10).longValue();
+ private static final long maxuint = new java.math.BigInteger("FFFFFFFF", 16).longValue();
+ private final Symbol alloy_hexnum(String txt) throws Err {
+    Pos p=alloy_here(txt);
+    long val = new java.math.BigInteger(txt, 16).longValue();
+    if (val <= maxint)
+      return decimalStringToNumberSym(p, Long.toString(val));
+    else if (val <= maxuint) 
+      return decimalStringToNumberSym(p, Long.toString(val-(maxuint+1)));
+    else
+      throw new ErrorSyntax(p, "The number "+txt+" is too large to be stored in a Java integer");
+ }
  private final Symbol alloy_num(String txt) throws Err {
     Pos p=alloy_here(txt);
-    int n=0;
-    try {
-       n=Integer.parseInt(txt);
-    } catch(NumberFormatException ex) {
+    return decimalStringToNumberSym(p, txt);    
+ }
+ private final Symbol decimalStringToNumberSym(Pos p, String txt) throws Err {
+   try {
+       int n = Integer.parseInt(txt);
+       return new Symbol(CompSym.NUMBER, p, ExprConstant.Op.NUMBER.make(p, n));
+   } catch(NumberFormatException ex) {
        throw new ErrorSyntax(p, "The number "+txt+" is too large to be stored in a Java integer");
-    }
-    return new Symbol(CompSym.NUMBER, p, ExprConstant.Op.NUMBER.make(p, n));
+   }
  }
 %}
 
@@ -153,6 +167,11 @@ import java_cup.runtime.*;
 "and"                 { return alloy_sym(yytext(), CompSym.AND         );}
 "assert"              { return alloy_sym(yytext(), CompSym.ASSERT      );}
 "as"                  { return alloy_sym(yytext(), CompSym.AS          );}
+"atoms"               { return alloy_sym(yytext(), CompSym.ATOMS       );}
+"atomsig"             { return alloy_sym(yytext(), CompSym.ATOM        );}
+"BitVector"           { return alloy_sym(yytext(), CompSym.BITVECTOR   );}
+"bitwidth"            { return alloy_sym(yytext(), CompSym.BITWIDTH    );}
+"bw"                  { return alloy_sym(yytext(), CompSym.BW          );}
 "but"                 { return alloy_sym(yytext(), CompSym.BUT         );}
 "check"               { return alloy_sym(yytext(), CompSym.CHECK       );}
 "disjoint"            { return alloy_sym(yytext(), CompSym.DISJ        );}
@@ -165,6 +184,7 @@ import java_cup.runtime.*;
 "expect"              { return alloy_sym(yytext(), CompSym.EXPECT      );}
 "extends"             { return alloy_sym(yytext(), CompSym.EXTENDS     );}
 "fact"                { return alloy_sym(yytext(), CompSym.FACT        );}
+"fix"                 { return alloy_sym(yytext(), CompSym.FIX         );}
 "for"                 { return alloy_sym(yytext(), CompSym.FOR         );}
 "fun"                 { return alloy_sym(yytext(), CompSym.FUN         );}
 "iden"                { return alloy_sym(yytext(), CompSym.IDEN        );}
@@ -174,11 +194,13 @@ import java_cup.runtime.*;
 "int"                 { return alloy_sym(yytext(), CompSym.INT         );}
 "in"                  { return alloy_sym(yytext(), CompSym.IN          );}
 "let"                 { return alloy_sym(yytext(), CompSym.LET         );}
+"literals"            { return alloy_sym(yytext(), CompSym.LITERALS    );}
 "lone"                { return alloy_sym(yytext(), CompSym.LONE        );}
 "module"              { return alloy_sym(yytext(), CompSym.MODULE      );}
 "none"                { return alloy_sym(yytext(), CompSym.NONE        );}
 "not"                 { return alloy_sym(yytext(), CompSym.NOT         );}
 "no"                  { return alloy_sym(yytext(), CompSym.NO          );}
+"of_bw"               { return alloy_sym(yytext(), CompSym.OF_BW       );}
 "one"                 { return alloy_sym(yytext(), CompSym.ONE         );}
 "open"                { return alloy_sym(yytext(), CompSym.OPEN        );}
 "or"                  { return alloy_sym(yytext(), CompSym.OR          );}
@@ -195,13 +217,18 @@ import java_cup.runtime.*;
 "sum"                 { return alloy_sym(yytext(), CompSym.SUM         );}
 "this"                { return alloy_sym(yytext(), CompSym.THIS        );}
 "univ"                { return alloy_sym(yytext(), CompSym.UNIV        );}
+"until"               { return alloy_sym(yytext(), CompSym.UNTIL       );}
+"when"                { return alloy_sym(yytext(), CompSym.WHEN        );}
+"while"               { return alloy_sym(yytext(), CompSym.WHILE       );}
+
 
 [\"] ([^\\\"] | ("\\" .))* [\"] [\$0-9a-zA-Z_\'\"] [\$0-9a-zA-Z_\'\"]* { throw new ErrorSyntax(alloy_here(yytext()),"String literal cannot be followed by a legal identifier character."); }
 [\"] ([^\\\"] | ("\\" .))* [\"]                                        { return alloy_string(yytext()); }
 [\"] ([^\\\"] | ("\\" .))*                                             { throw new ErrorSyntax(alloy_here(yytext()),"String literal is missing its closing \" character"); }
+0[xX#][0-9a-fA-F][0-9a-fA-F]*                                          { String txt = yytext(); return alloy_hexnum(txt.substring(2, txt.length())); }
 [0-9][0-9]*[\$a-zA-Z_\'\"][\$0-9a-zA-Z_\'\"]*                          { throw new ErrorSyntax(alloy_here(yytext()),"Name cannot start with a number."); }
 [0-9][0-9]*                                                            { return alloy_num (yytext()); }
-[:jletter:][[:jletterdigit:]\'\"]*                                      { return alloy_id  (yytext()); }
+[:jletter:][[:jletterdigit:]\'\"]*                                     { return alloy_id  (yytext()); }
 //[\$a-zA-Z][\$0-9a-zA-Z_\'\"]*                                          { return alloy_id  (yytext()); }
 
 "/**" ~"*/"                  { }

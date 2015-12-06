@@ -38,19 +38,25 @@ public final class A4Options implements Serializable {
         private final String external;
         /** If not null, this is the set of options to use with the command-line solver. */
         private final String[] options;
+        /** is parallel */
+        private final boolean isParallel;
         /** Constructs a new SatSolver value. */
         private SatSolver(String id, String toString, String external, String[] options, boolean add) {
+            this(id, toString, external, false, options, add);
+        }
+        private SatSolver(String id, String toString, String external, boolean isParallel, String[] options, boolean add) {
             this.id=id;
             this.toString=toString;
             this.external=external;
+            this.isParallel = isParallel;
             this.options=new String[options!=null ? options.length : 0];
             for(int i=0; i<this.options.length; i++) this.options[i] = options[i];
             if (add) { synchronized(SatSolver.class) { values.add(this); } }
         }
         /** Constructs a new SatSolver value that uses a command-line solver; throws ErrorAPI if the ID is already in use. */
-        public static SatSolver make(String id, String toString, String external, String[] options) throws ErrorAPI {
+        public static SatSolver make(String id, String toString, String external, boolean isParallel, String[] options) throws ErrorAPI {
             if (id==null || toString==null || external==null) throw new ErrorAPI("NullPointerException in SatSolver.make()");
-            SatSolver ans = new SatSolver(id, toString, external, options, false);
+            SatSolver ans = new SatSolver(id, toString, external, isParallel, options, false);
             synchronized(SatSolver.class) {
                for(SatSolver x: values)
                   if (x.id.equals(id))
@@ -60,7 +66,7 @@ public final class A4Options implements Serializable {
             return ans;
         }
         /** Constructs a new SatSolver value that uses a command-line solver; throws ErrorAPI if the ID is already in use. */
-        public static SatSolver make(String id, String toString, String external) throws ErrorAPI { return make(id, toString, external, null); }
+        public static SatSolver make(String id, String toString, String external) throws ErrorAPI { return make(id, toString, external, false, null); }
         /** Returns the executable for the external command-line solver to use (or null if this solver does not use an external commandline solver) */
         public String external() { return external; }
         /** Returns the options for the external command-line solver to use (or empty array if this solver does not use an external commandline solver) */
@@ -105,7 +111,7 @@ public final class A4Options implements Serializable {
         // public static final SatSolver ZChaffJNI = new SatSolver("zchaff(jni)", "ZChaff with mincost", null, null, true);
         /** Lingeling */
         public static final SatSolver LingelingJNI = new SatSolver("lingeling(jni)", "Lingeling", null, null, true);
-        public static final SatSolver PLingelingJNI = new SatSolver("plingeling(jni)", "PLingeling", null, null, true);
+        public static final SatSolver PLingelingJNI = new SatSolver("plingeling(jni)", "PLingeling", "plingeling", true, null, true);
         /** Glucose */
         public static final SatSolver GlucoseJNI = new SatSolver("glucose(jni)", "Glucose", null, null, true);
         /** CryptoMiniSat */
@@ -117,6 +123,7 @@ public final class A4Options implements Serializable {
         /** Outputs the raw Kodkod file only */
         public static final SatSolver KK = new SatSolver("kodkod", "Output Kodkod to file", null, null, true);
 
+        public boolean isParellel() { return isParallel; }
     }
 
     /** This ensures the class can be serialized reliably. */
@@ -124,8 +131,6 @@ public final class A4Options implements Serializable {
 
     /** Constructs an A4Options object with default values for everything. */
     public A4Options() { }
-    
-    public boolean inferPartialInstance = true;
 
     /** This option specifies the amount of symmetry breaking to do (when symmetry breaking isn't explicitly disabled).
      *
@@ -157,6 +162,10 @@ public final class A4Options implements Serializable {
      */
     public SatSolver solver = SatSolver.SAT4J;
 
+    /** Number of SAT solver threads */
+    public int solverThreads = 4;
+    public boolean solverThreadsShareClauses = true;
+
     /** When this.solver is external, and the solver filename is a relative filename, then this option specifies
      * the directory that the solver filename is relative to.
      */
@@ -181,24 +190,45 @@ public final class A4Options implements Serializable {
      *  that don't cause any overflows. */
     public boolean noOverflow = false;
 
-    /** This option constrols how deep we unroll loops and unroll recursive predicate/function/macros (negative means it's disallowed) */
+    /** This option controls how deep we unroll loops and unroll recursive predicate/function/macros (negative means it's disallowed) */
     public int unrolls = (-1);
+
+    /** Partial instance in a special serialized format */
+    public String partialInstance = null;
+
+    /** Whether to rename kodkod atoms according to their types*/
+    public boolean renameAtoms = true;
+    /** Whether to create a singleton relation for each atom (useful for incremental solving) */
+    // public boolean createAtomRelations = true;
+    /** Whether to use higher order solver */
+    public boolean higherOrderSolver = false;
+    public boolean holFullIncrements = false;
+    public int holMaxIter = -1;
+    public boolean convertHolInst2A4Sol = false;
 
     /** This method makes a copy of this Options object. */
     public A4Options dup() {
         A4Options x = new A4Options();
-        x.inferPartialInstance = inferPartialInstance;
         x.unrolls = unrolls;
         x.symmetry = symmetry;
         x.skolemDepth = skolemDepth;
+        //x.createAtomRelations = createAtomRelations;
+        x.higherOrderSolver = higherOrderSolver;
+        x.holMaxIter = holMaxIter;
+        x.holFullIncrements = holFullIncrements;
+        x.convertHolInst2A4Sol = convertHolInst2A4Sol;
         x.coreMinimization = coreMinimization;
         x.solver = solver;
+        x.solverThreads = solverThreads;
+        x.solverThreadsShareClauses = solverThreadsShareClauses;
         x.solverDirectory = solverDirectory;
         x.tempDirectory = tempDirectory;
         x.originalFilename = originalFilename;
         x.recordKodkod = recordKodkod;
         x.noOverflow = noOverflow;
         x.coreGranularity = coreGranularity;
+        x.partialInstance = partialInstance;
+        x.renameAtoms = renameAtoms;
         return x;
     }
 }

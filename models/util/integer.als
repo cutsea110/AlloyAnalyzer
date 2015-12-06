@@ -1,12 +1,20 @@
 module util/integer
 
-/*
+/**
  * A collection of utility functions for using Integers in Alloy.
  * Note that integer overflows are silently truncated to the current bitwidth
  * using the 2's complement arithmetic, unless the "forbid overfows" option is
  * turned on, in which case only models that don't have any overflows are 
  * analyzed. 
  */
+ 
+sig Bit in Int {}
+
+fun BitTrue  : Bit { -1 }
+fun BitFalse : Bit { 0 }
+
+fact { Bit = BitFalse + BitTrue }
+ 
 
 fun add  [n1, n2: Int] : Int { this/plus[n1, n2] }
 fun plus [n1, n2: Int] : Int { n1 fun/add n2 }
@@ -15,6 +23,28 @@ fun sub   [n1, n2: Int] : Int { this/minus[n1, n2] }
 fun minus [n1, n2: Int] : Int { n1 fun/sub n2 }
 
 fun mul [n1, n2: Int] : Int { n1 fun/mul n2 }
+
+fun bvneg [n: Int]      : Int { fun/bvneg n     }
+fun bvnot [n: Int]      : Int { fun/bvnot n     }
+fun bvand [n1, n2: Int] : Int { n1 fun/bvand n2 }
+fun bvxor [n1, n2: Int] : Int { n1 fun/bvxor n2 }
+fun bvor  [n1, n2: Int] : Int { n1 fun/bvor n2  }
+fun bvshl [n1, n2: Int] : Int { n1 fun/bvshl n2 }
+fun bvshr [n1, n2: Int] : Int { n1 fun/bvshr n2 }
+fun bvsha [n1, n2: Int] : Int { n1 fun/bvsha n2 }
+pred bveq [n1, n2: Int]       { n1 fun/bveq n2 }
+
+fun bvadd [n1, n2: Int] : Int { this/plus[n1, n2] }
+fun bvsub [n1, n2: Int] : Int { this/minus[n1, n2] }
+fun bvmul [n1, n2: Int] : Int { this/mul[n1, n2] }
+fun bvdiv [n1, n2: Int] : Int { this/div[n1, n2] }
+
+fun Not [n: Int]      : Int { this/bvnot[n] }
+fun And [n1, n2: Int] : Int { this/bvand[n1, n2] }
+fun Nand[n1, n2: Int] : Int { this/bvnot[this/bvand[n1, n2]] }
+fun Or  [n1, n2: Int] : Int { this/bvor[n1, n2] }
+fun Nor [n1, n2: Int] : Int { this/bvnot[this/bvor[n1, n2]] }
+fun Xor [n1, n2: Int] : Int { this/bvxor[n1, n2] }
 
 /**
  * Performs the division with "round to zero" semantics, except the following 3 cases

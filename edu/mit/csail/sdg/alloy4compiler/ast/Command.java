@@ -20,12 +20,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import edu.mit.csail.sdg.alloy4.Err;
-import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.ConstList;
-import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4.ConstList.TempList;
+import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
+import edu.mit.csail.sdg.alloy4.Pos;
+import edu.mit.csail.sdg.alloy4.Util;
 
 /** Immutable; reresents a "run" or "check" command.
  *
@@ -54,7 +54,7 @@ public final class Command extends Browsable {
     public final int overall;
 
     /** The integer bitwidth (0 or higher) (Or -1 if it was not specified). */
-    public final int bitwidth;
+    public final IntScope intScope;
 
     /** The maximum sequence length (0 or higher) (Or -1 if it was not specified). */
     public final int maxseq;
@@ -79,13 +79,14 @@ public final class Command extends Browsable {
         if (parent!=null) { Command p=parent; while(p.parent!=null) p=p.parent; return p.toString(); }
         boolean first=true;
         StringBuilder sb=new StringBuilder(check?"Check ":"Run ").append(label);
-        if (overall>=0 && (bitwidth>=0 || maxseq>=0 || scope.size()>0))
+        int bw = intScope != null && intScope.bitwidth != null ? intScope.bitwidth : -1;
+        if (overall>=0 && (bw>=0 || maxseq>=0 || scope.size()>0))
             sb.append(" for ").append(overall).append(" but");
         else if (overall>=0)
             sb.append(" for ").append(overall);
-        else if (bitwidth>=0 || maxseq>=0 || scope.size()>0)
+        else if (bw>=0 || maxseq>=0 || scope.size()>0)
             sb.append(" for");
-        if (bitwidth>=0) { sb.append(" ").append(bitwidth).append(" int"); first=false; }
+        if (bw>=0) { sb.append(" ").append(bw).append(" int"); first=false; }
         if (maxseq>=0) { sb.append(first?" ":", ").append(maxseq).append(" seq"); first=false; }
         for(CommandScope e:scope) {
             sb.append(first?" ":", ").append(e);
@@ -104,7 +105,11 @@ public final class Command extends Browsable {
      * @param formula - the formula that must be satisfied by this command
      */
     public Command(boolean check, int overall, int bitwidth, int maxseq, Expr formula) throws ErrorSyntax {
-        this(null, "", check, overall, bitwidth, maxseq, -1, null, null, formula, null);
+        this(check, overall, IntScope.mkBitwidth(bitwidth), maxseq, formula);
+    }
+
+    public Command(boolean check, int overall, IntScope intScope, int maxseq, Expr formula) throws ErrorSyntax {
+        this(null, "", check, overall, intScope, maxseq, -1, null, null, formula, null);
     }
 
     /** Constructs a new Command object.
@@ -113,42 +118,79 @@ public final class Command extends Browsable {
      * @param label - the label for this command (it is only for pretty-printing and does not have to be unique)
      * @param check - true if this is a "check"; false if this is a "run"
      * @param overall - the overall scope (0 or higher) (-1 if no overall scope was specified)
-     * @param bitwidth - the integer bitwidth (0 or higher) (-1 if it was not specified)
+     * @param intScope - the integer bitwidth (0 or higher) (-1 if it was not specified)
      * @param maxseq - the maximum sequence length (0 or higher) (-1 if it was not specified)
      * @param expects - the expected value (0 or 1) (-1 if no expectation was specified)
      * @param scope - a list of scopes (can be null if we want to use default)
      * @param additionalExactSig - a list of sigs whose scope shall be considered exact though we may or may not know what the scope is yet
      * @param formula - the formula that must be satisfied by this command
      */
-    public Command(Pos pos, String label, boolean check, int overall, int bitwidth, int maxseq, int expects, Iterable<CommandScope> scope, Iterable<Sig> additionalExactSig, Expr formula, Command parent) {
+    public Command(Pos pos, String label, boolean check, int overall, IntScope intScope, int maxseq, int expects, Iterable<CommandScope> scope, Iterable<Sig> additionalExactSig, Expr formula, Command parent) {
         if (pos==null) pos = Pos.UNKNOWN;
         this.formula = formula;
         this.pos = pos;
         this.label = (label==null ? "" : label);
         this.check = check;
         this.overall = (overall<0 ? -1 : overall);
-        this.bitwidth = (bitwidth<0 ? -1 : bitwidth);
+        this.intScope = intScope; //(bitwidth<0 ? -1 : bitwidth);
         this.maxseq = (maxseq<0 ? -1 : maxseq);
         this.maxstring = (-1);
         this.expects = (expects<0 ? -1 : (expects>0 ? 1 : 0));
         this.scope = ConstList.make(scope);
         this.additionalExactScopes = ConstList.make(additionalExactSig);
         this.parent = parent;
+
+        //TODO: delete NOTE: encoding
+//        if (intScope == null) {
+//            this.bw = -1;
+//            this.minInt = 0;
+//            this.maxInt = -1;
+//            this.intInc = 1;
+//        } else if (intScope instanceof IntScope) {
+//            //TODO
+//            this.bw = -1;
+//            this.minInt = 0;
+//            this.maxInt = -1;
+//            this.intInc = 1;
+//        } else {
+//            if (intScope.startingScope() == intScope.endingScope()) {
+//                if (intScope.increment() == 0) {
+//                    this.bw = Util.minBw(intScope.startingScope());
+//                    this.minInt = intScope.startingScope();
+//                    this.maxInt = intScope.startingScope();
+//                } else {
+//                    this.bw = intScope.startingScope();
+//                    this.minInt = Util.min(this.bw);
+//                    this.maxInt = Util.max(this.bw);
+//                }
+//                this.intInc = 1;
+//            } else {
+//                this.minInt = intScope.startingScope();
+//                this.maxInt = intScope.endingScope();
+//                this.intInc = intScope.increment();
+//                this.bw = Math.max(Util.minBw(this.minInt), Util.minBw(this.maxInt));
+//            }
+//        }
     }
 
+    /** Constructs a new Command object where it is the same as the current object, except with a different intScope. */
+    public Command change(IntScope newIntScope) {
+        return new Command(pos, label, check, overall, newIntScope, maxseq, expects, scope, additionalExactScopes, formula, parent);
+    }
+    
     /** Constructs a new Command object where it is the same as the current object, except with a different formula. */
     public Command change(Expr newFormula) {
-        return new Command(pos, label, check, overall, bitwidth, maxseq, expects, scope, additionalExactScopes, newFormula, parent);
+        return new Command(pos, label, check, overall, intScope, maxseq, expects, scope, additionalExactScopes, newFormula, parent);
     }
 
     /** Constructs a new Command object where it is the same as the current object, except with a different scope. */
     public Command change(ConstList<CommandScope> scope) {
-        return new Command(pos, label, check, overall, bitwidth, maxseq, expects, scope, additionalExactScopes, formula, parent);
+        return new Command(pos, label, check, overall, intScope, maxseq, expects, scope, additionalExactScopes, formula, parent);
     }
 
     /** Constructs a new Command object where it is the same as the current object, except with a different list of "additional exact sigs". */
     public Command change(Sig... additionalExactScopes) {
-        return new Command(pos, label, check, overall, bitwidth, maxseq, expects, scope, Util.asList(additionalExactScopes), formula, parent);
+        return new Command(pos, label, check, overall, intScope, maxseq, expects, scope, Util.asList(additionalExactScopes), formula, parent);
     }
 
     /** Constructs a new Command object where it is the same as the current object, except with a different scope for the given sig. */
@@ -173,7 +215,7 @@ public final class Command extends Browsable {
     /** Helper method that returns true iff this command contains at least one growable sig. */
     public ConstList<Sig> getGrowableSigs() {
         TempList<Sig> answer = new TempList<Sig>();
-        for(CommandScope sc: scope) if (sc.startingScope != sc.endingScope) answer.add(sc.sig);
+        for(CommandScope sc: scope) if (sc.startingScope() != sc.endingScope()) answer.add(sc.sig);
         return answer.makeConst();
     }
 
@@ -185,11 +227,6 @@ public final class Command extends Browsable {
                 if (x.op==ExprConstant.Op.STRING) set.add(x.string);
                 return null;
             }
-            @Override public Object visit(ExprCall x) throws Err {
-                x.fun.getBody().accept(this);
-                for (Expr e : x.args) e.accept(this);
-                return null;
-            }            
         };
         for(Command c=this; c!=null; c=c.parent) c.formula.accept(findString);
         for(Sig s: sigs) {

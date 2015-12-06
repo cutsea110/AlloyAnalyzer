@@ -39,6 +39,9 @@ public class DefaultSymbolFactory implements SymbolFactory{
     public Symbol newSymbol(String name, int id, int left, int right, Object value){
         return new Symbol(id,left,right,value);
     }
+    public Symbol newSymbol(String name, int id, Object value){
+        return new Symbol(id,-1,-1,value);
+    }
     public Symbol newSymbol(String name, int id, int left, int right){
         return new Symbol(id,left,right);
     }

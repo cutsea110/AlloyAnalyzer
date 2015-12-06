@@ -24,13 +24,16 @@ import java.awt.event.ComponentListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.LinkedHashMap;
+
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+
 import edu.mit.csail.sdg.alloy4.Listener.Event;
 
 /** Graphical multi-tabbed syntax-highlighting editor.
@@ -84,6 +87,9 @@ public final class OurTabbedSyntaxWidget {
    /** The list of tabs. */
    private final List<OurSyntaxWidget> tabs = new ArrayList<OurSyntaxWidget>();
 
+   /** selection history */
+   private final LinkedHashMap<String, OurSyntaxWidget> selectionHistory = new LinkedHashMap<String, OurSyntaxWidget>();
+
    /** The currently selected tab from 0 to list.size()-1 (This value must be 0 if there are no tabs) */
    private int me = 0;
 
@@ -94,6 +100,7 @@ public final class OurTabbedSyntaxWidget {
          if (sender instanceof OurSyntaxWidget) switch(e) {
             case FOCUSED:        listeners.fire(me, e); break;
             case CARET_MOVED:    listeners.fire(me, Event.STATUS_CHANGE); break;
+            case CARET_CMD:      listeners.fire(me, e); break;
             case CTRL_PAGE_UP:   prev(); break;
             case CTRL_PAGE_DOWN: next(); break;
             case STATUS_CHANGE:
@@ -108,6 +115,7 @@ public final class OurTabbedSyntaxWidget {
                if (t.obj1 instanceof JLabel) { ((JLabel)(t.obj1)).setText("  " + n + (t.modified() ? " *  " : "  ")); }
                listeners.fire(me, Event.STATUS_CHANGE);
                break;
+            default: break;
          }
          return true;
       }
@@ -153,19 +161,34 @@ public final class OurTabbedSyntaxWidget {
    public void clearShade() { for(int i=0; ;i++) if (i < tabs.size()) tabs.get(i).clearShade(); else { adjustLabelColor(); break; } }
 
    /** Switch to the i-th tab (Note: if successful, it will always send STATUS_CHANGE to the registered listeners. */
-   private void select(int i) {
+   public void select(int i) {
       if (i < 0 || i >= tabs.size()) return; else { me=i; component.revalidate(); adjustLabelColor(); component.removeAll(); }
       if (tabs.size() > 1) component.add(tabBarScroller, BorderLayout.NORTH);
-      tabs.get(me).addTo(component, BorderLayout.CENTER);
+      OurSyntaxWidget selectedTab = tabs.get(me);
+      selectionHistory.remove(selectedTab.getFilename());
+      selectionHistory.put(selectedTab.getFilename(), selectedTab);
+      selectedTab.addTo(component, BorderLayout.CENTER);
       component.repaint();
-      tabs.get(me).requestFocusInWindow();
+      selectedTab.requestFocusInWindow();
       tabBar.scrollRectToVisible(new Rectangle(0,0,0,0)); // Forces recalculation
-      tabBar.scrollRectToVisible(new Rectangle(tabs.get(me).obj2.getX(), 0, tabs.get(me).obj2.getWidth()+200, 1));
+      tabBar.scrollRectToVisible(new Rectangle(selectedTab.obj2.getX(), 0, selectedTab.obj2.getWidth()+200, 1));
       listeners.fire(this, Event.STATUS_CHANGE);
+   }
+
+   public void selectByFilename(String filename) {
+       int i = 0;
+       while (i < tabs.size() && !tabs.get(i).getFilename().equals(filename)) i++;
+       select(i);
    }
 
    /** Refresh all tabs. */
    public void reloadAll() { for(OurSyntaxWidget t: tabs) t.reload(); }
+
+   public ArrayList<String> getSelectionHistory() {
+       ArrayList<String> ans = new ArrayList<String>(selectionHistory.keySet());
+       Collections.reverse(ans);
+       return ans;
+   }
 
    /** Return the list of all filenames except the filename in the i-th tab. */
    private List<String> getAllNamesExcept(int i) {
@@ -191,10 +214,18 @@ public final class OurTabbedSyntaxWidget {
     */
    private boolean close(int i) {
       clearShade();
-      if (i<0 || i>=tabs.size()) return true; else if (!tabs.get(i).discard(true, getAllNamesExcept(i))) return false;
+      if (i<0 || i>=tabs.size()) return true;
+      if (!discard(tabs.get(i), true, getAllNamesExcept(i))) return false;
       if (tabs.size() > 1) { tabBar.remove(i);  tabs.remove(i);  if (me >= tabs.size()) me = tabs.size() - 1; }
       select(me);
       return true;
+   }
+
+   private boolean discard(OurSyntaxWidget widget, boolean askUser, List<String> bannedNames) {
+      String tabFilename = widget.getFilename();
+      boolean discardConfirmed = widget.discard(askUser, bannedNames);
+      if (discardConfirmed) selectionHistory.remove(tabFilename);
+      return discardConfirmed;
    }
 
    /** Close the current tab (then create a new empty tab if there were no tabs remaining) */
@@ -209,6 +240,9 @@ public final class OurTabbedSyntaxWidget {
 
    /** Returns the number of tabs. */
    public int count() { return tabs.size();  }
+
+   /** Returns the index of the currently selected tab */
+   public int selected() { return me; }
 
    /** Return a modifiable map from each filename to its text content (Note: changes to the map does NOT affect this object) */
    public Map<String,String> takeSnapshot() {
@@ -229,7 +263,8 @@ public final class OurTabbedSyntaxWidget {
    public void enableSyntax(boolean flag) {  syntaxHighlighting=flag;  for(OurSyntaxWidget t: tabs) t.enableSyntax(flag);  }
 
    /** Returns the JTextArea of the current text buffer. */
-   public OurSyntaxWidget get() { return (me>=0 && me<tabs.size()) ? tabs.get(me) : new OurSyntaxWidget(); }
+   public OurSyntaxWidget get()        { return get(me); }
+   public OurSyntaxWidget get(int idx) { return (idx>=0 && idx<tabs.size()) ? tabs.get(idx) : new OurSyntaxWidget(); }
 
    /** True if the i-th text buffer has been modified since it was last loaded/saved */
    public boolean modified(int i)  { return (i>=0 && i<tabs.size()) ? tabs.get(i).modified() : false; }
@@ -265,11 +300,11 @@ public final class OurTabbedSyntaxWidget {
       tabs.add(text);
       text.listeners.add(listener); // add listener AFTER we've updated this.tabs and this.tabBar
       if (filename==null) {
-         text.discard(false, getFilenames()); // forces the tab to re-derive a suitable fresh name
+         discard(text, false, getFilenames()); // forces the tab to re-derive a suitable fresh name
       } else {
          if (!text.load(filename)) return false;
          for(int i=tabs.size()-1; i>=0; i--) if (!tabs.get(i).isFile() && tabs.get(i).getText().length()==0) {
-            tabs.get(i).discard(false, getFilenames()); close(i); break; // Remove the rightmost untitled empty tab
+            discard(tabs.get(i), false, getFilenames()); close(i); break; // Remove the rightmost untitled empty tab
          }
       }
       select(tabs.size() - 1); // Must call this to switch to the new tab; and it will fire STATUS_CHANGE message which is important

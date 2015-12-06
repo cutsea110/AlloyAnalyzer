@@ -18,9 +18,10 @@ package edu.mit.csail.sdg.alloy4;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.Vector;
+
 import javax.swing.Icon;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;

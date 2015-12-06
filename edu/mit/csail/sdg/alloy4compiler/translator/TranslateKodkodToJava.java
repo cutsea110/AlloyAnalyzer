@@ -386,10 +386,10 @@ public final class TranslateKodkodToJava implements VoidVisitor {
         String newname=makename(x); if (newname==null) return;
         String sub=make(x.intExpr());
         switch(x.op()) {
-           case MINUS: file.printf("IntExpression %s=%s.negate();%n", newname, sub); break;
            case NOT: file.printf("IntExpression %s=%s.not();%n", newname, sub); break;
            case ABS: file.printf("IntExpression %s=%s.abs();%n", newname, sub); break;
            case SGN: file.printf("IntExpression %s=%s.signum();%n", newname, sub); break;
+           case NEG: file.printf("IntExpression %s=%s.negate();%n", newname, sub); break;
            default: throw new RuntimeException("Unknown kodkod operator \""+x.op()+"\" encountered");
         }
     }
@@ -402,6 +402,7 @@ public final class TranslateKodkodToJava implements VoidVisitor {
            case CLOSURE: file.printf("Expression %s=%s.closure();%n", newname, sub); break;
            case REFLEXIVE_CLOSURE: file.printf("Expression %s=%s.reflexiveClosure();%n", newname, sub); break;
            case TRANSPOSE: file.printf("Expression %s=%s.transpose();%n", newname, sub); break;
+           case PRE:               file.printf("Expression %s=%s.pre();%n", newname, sub); break;
            default: throw new RuntimeException("Unknown kodkod operator \""+x.op()+"\" encountered");
         }
     }

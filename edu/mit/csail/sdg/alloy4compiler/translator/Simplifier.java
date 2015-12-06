@@ -17,9 +17,7 @@ package edu.mit.csail.sdg.alloy4compiler.translator;
 
 import java.util.Iterator;
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.A4Reporter;
-import edu.mit.csail.sdg.alloy4.Err;
-import edu.mit.csail.sdg.alloy4.MailBug;
+
 import kodkod.ast.BinaryExpression;
 import kodkod.ast.BinaryFormula;
 import kodkod.ast.ComparisonFormula;
@@ -31,6 +29,9 @@ import kodkod.ast.operator.ExprCompOperator;
 import kodkod.ast.operator.ExprOperator;
 import kodkod.ast.operator.FormulaOperator;
 import kodkod.instance.TupleSet;
+import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
+import edu.mit.csail.sdg.alloy4.MailBug;
 
 /** Immutable; this class shrinks the unknowns as much as possible in order to reduce the number of variables in final CNF.
  *
@@ -45,7 +46,7 @@ import kodkod.instance.TupleSet;
 public class Simplifier {
 
     /** Reporter for receiving debug messages. */
-    private A4Reporter rep = null;
+    private IA4Reporter rep = null;
 
     /** The A4Solution object we are attempting to simplify. */
     private A4Solution sol = null;
@@ -60,7 +61,7 @@ public class Simplifier {
      * Subclasses should override this method to implement different simplification algorithms.
      * (Note: this method is allowed to modify the "formulas" array if it sees an opportunity for optimization)
      */
-    public boolean simplify(A4Reporter rep, A4Solution sol, List<Formula> formulas) throws Err {
+    public boolean simplify(IA4Reporter rep, A4Solution sol, List<Formula> formulas) throws Err {
        this.rep = rep;
        this.sol = sol;
        while(true) {
@@ -180,7 +181,7 @@ public class Simplifier {
        }
        return true;
     }
-    
+
     // ALTERNATIVE VERSION THAT COMPUTES LOWER BOUNDS AS WELL
 //    /** Simplify the bounds based on the fact that "a is subset of b"; return false if we discover the formula is unsat. */
 //    private final boolean simplify_in(Expression a, Expression b) {
@@ -188,38 +189,38 @@ public class Simplifier {
 //       b = condense(b);
 //       if (a instanceof Relation) {
 //          return simpIn((Relation)a, b, true);
-//       } 
+//       }
 //       if (b instanceof Relation) {
 //           return simpIn((Relation)b, a, false);
 //       }
 //       return true;
 //    }
-//    
+//
 //    private final boolean simpIn(Relation r, Expression b, boolean bIsUpper) {
 //        try {
 //            TupleSet ub = sol.query(true, r, false);
-//            TupleSet lb = sol.query(false, r, false); 
+//            TupleSet lb = sol.query(false, r, false);
 //            TupleSet t = sol.approximate(b);
 //            t.retainAll(ub);
 //            if (bIsUpper) {
 //                if (!t.containsAll(lb)) {
 //                    // This means the upperbound is shrunk BELOW the lowerbound.
-//                    rep.debug("Comment: Simplify upper "+r+" "+ub.size()+"->false\n"); 
-//                    return false; 
-//                } 
-//                if (t.size() < ub.size()) { 
-//                    rep.debug("Comment: Simplify upper "+r+" "+ub.size()+"->"+t.size()+"\n"); 
-//                    sol.shrink(r,lb,t); 
+//                    rep.debug("Comment: Simplify upper "+r+" "+ub.size()+"->false\n");
+//                    return false;
+//                }
+//                if (t.size() < ub.size()) {
+//                    rep.debug("Comment: Simplify upper "+r+" "+ub.size()+"->"+t.size()+"\n");
+//                    sol.shrink(r,lb,t);
 //                }
 //            } else {
 //                if (!ub.containsAll(t)) {
 //                    // This means the upperbound is shrunk BELOW the lowerbound.
-//                    rep.debug("Comment: Simplify lower "+r+" "+lb.size()+"->false\n"); 
-//                    return false; 
-//                } 
-//                if (lb.size() < t.size()) { 
-//                    rep.debug("Comment: Simplify lower "+r+" "+lb.size()+"->"+t.size()+"\n"); 
-//                    sol.shrink(r,t,ub); 
+//                    rep.debug("Comment: Simplify lower "+r+" "+lb.size()+"->false\n");
+//                    return false;
+//                }
+//                if (lb.size() < t.size()) {
+//                    rep.debug("Comment: Simplify lower "+r+" "+lb.size()+"->"+t.size()+"\n");
+//                    sol.shrink(r,t,ub);
 //                }
 //            }
 //         } catch(Throwable ex) {

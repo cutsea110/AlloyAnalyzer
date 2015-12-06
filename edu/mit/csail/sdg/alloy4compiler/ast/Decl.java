@@ -16,8 +16,9 @@
 package edu.mit.csail.sdg.alloy4compiler.ast;
 
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.Pos;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.Pos;
 
 /** Immutable; this declaration binds a list of names to an expression. */
 

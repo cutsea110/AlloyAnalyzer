@@ -15,21 +15,23 @@
 
 package edu.mit.csail.sdg.alloy4compiler.ast;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.Pos;
+
+import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
+import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
-import edu.mit.csail.sdg.alloy4.ErrorSyntax;
-import edu.mit.csail.sdg.alloy4.ConstList;
-import edu.mit.csail.sdg.alloy4.Version;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
-import edu.mit.csail.sdg.alloy4compiler.ast.Attr.AttrType;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4.Util;
+import edu.mit.csail.sdg.alloy4.Version;
+import edu.mit.csail.sdg.alloy4compiler.ast.Attr.AttrType;
 
 /** Mutable; represents a signature. */
 
@@ -49,10 +51,10 @@ public abstract class Sig extends Expr {
 
    /** The built-in "none" signature. */
    public static final PrimSig NONE = new PrimSig("none", null, false);
-   
+
    /** The built-in "none" signature. */
    public static final PrimSig GHOST = mkGhostSig();
-   
+
    private static final PrimSig mkGhostSig() {
        try {
            return new PrimSig("Univ", null, new Attr[0]);
@@ -60,6 +62,12 @@ public abstract class Sig extends Expr {
            return null; // never happens
        }
    }
+
+   /** Strips 'this/' from the beginning of the label. */
+   public String shortLabel() { return label.startsWith("this/") ? label.substring(5) : label; }
+
+   /** Strips 'this/' from the beginning of the label. */
+   public String shortLabelNoPI() { return shortLabel(); }
 
    /** Returns the name for this sig; this name need not be unique. */
    @Override public final String toString() { return label; }
@@ -116,6 +124,9 @@ public abstract class Sig extends Expr {
     */
    public final Pos isOne;
 
+   /** Nonnull if this sig is declared as atom. */
+   public final Pos isAtom;
+
    /** Nonnull if this sig's multiplicity is declared to be some.
     * <p> Note: at most one of "lone", "one", "some" can be nonnull for each sig.
     */
@@ -160,6 +171,7 @@ public abstract class Sig extends Expr {
       this.isAbstract = null;
       this.isLone = null;
       this.isOne = null;
+      this.isAtom = null;
       this.isSome = null;
       this.label = label;
       this.isSubset = null;
@@ -177,17 +189,20 @@ public abstract class Sig extends Expr {
       Expr oneof = ExprUnary.Op.ONEOF.make(null, this);
       ExprVar v = ExprVar.make(null, "this", oneof.type);
       this.decl = new Decl(null, null, null, Util.asList(v), oneof);
-      Pos isAbstract=null, isLone=null, isOne=null, isSome=null, isSubsig=null, isSubset=null, isPrivate=null, isMeta=null, isEnum=null;
+      Pos isAbstract=null, isLone=null, isOne=null, isAtom=null, isSome=null, isSubsig=null, isSubset=null, isPrivate=null, isMeta=null, isEnum=null;
       for(Attr a: attributes) if (a!=null) switch(a.type) {
          case ABSTRACT: isAbstract = a.pos.merge(isAbstract); break;
          case ENUM:     isEnum     = a.pos.merge(isEnum);     break;
          case LONE:     isLone     = a.pos.merge(isLone);     break;
          case META:     isMeta     = a.pos.merge(isMeta);     break;
          case ONE:      isOne      = a.pos.merge(isOne);      break;
+         case ATOM:     isAtom     = a.pos.merge(isAtom);     break;
          case PRIVATE:  isPrivate  = a.pos.merge(isPrivate);  break;
          case SOME:     isSome     = a.pos.merge(isSome);     break;
          case SUBSET:   isSubset   = a.pos.merge(isSubset);   break;
          case SUBSIG:   isSubsig   = a.pos.merge(isSubsig);   break;
+         default:
+             break;
       }
       this.isPrivate  = isPrivate;
       this.isMeta     = isMeta;
@@ -195,6 +210,7 @@ public abstract class Sig extends Expr {
       this.isAbstract = isAbstract;
       this.isLone     = isLone;
       this.isOne      = isOne;
+      this.isAtom     = isAtom;
       this.isSome     = isSome;
       this.isSubset   = isSubset;
       this.isSubsig   = isSubsig;
@@ -207,6 +223,8 @@ public abstract class Sig extends Expr {
       if (isSubset!=null && isSubsig!=null)   throw new ErrorSyntax(isAbstract,  "Subset signature cannot be a regular subsignature.");
    }
 
+   public boolean isIntSubsetSig() { return false; }
+   
    /** Returns true if we can determine the two expressions are equivalent; may sometimes return false. */
    @Override public boolean isSame(Expr obj) {
       Sig me = this;
@@ -255,6 +273,31 @@ public abstract class Sig extends Expr {
 
    //==============================================================================================================//
 
+   public static final class AtomSig extends Sig {
+
+      /** If this is UNIV or NONE, then this field is null, else this field is the parent sig. */
+      public final PrimSig parent;
+
+      public AtomSig (String label, PrimSig parent) throws Err {
+         super(parent.type, label, new Attr[] { Attr.ONE, Attr.EXACT });
+         PrimSig.checkParent(parent, pos, label);
+         parent.atoms.add(this);
+         this.parent = parent;
+         for( ; parent!=null ; parent=parent.parent) if (parent.isEnum!=null) {
+            if (parent!=this.parent) throw new ErrorSyntax(pos, "sig "+label+" cannot extend a signature which is an atom in an enum.");
+            if (isOne==null) throw new ErrorSyntax(pos, "sig "+label+" is an atom in an enum, so it must have the \"one\" multiplicity.");
+         }
+      }
+
+      /** {@inheritDoc} */
+      @Override public boolean isSameOrDescendentOf(Sig that) {
+         if (this==that || that==UNIV) return true;
+         if (that==NONE) return false;
+         for(PrimSig me=this.parent; me!=null; me=me.parent) if (me==that) return true;
+         return false;
+      }
+   }
+
    /** Mutable; reresents a non-subset signature.
     *
     * <p> Note: except for "children()", the return value of every method is always valid for all time;
@@ -263,8 +306,21 @@ public abstract class Sig extends Expr {
     */
 
    public static final class PrimSig extends Sig {
+       // [PI]
+       private final SafeList<AtomSig> atoms = new SafeList<AtomSig>();
+       public SafeList<AtomSig> atomSigs() throws Err {
+          return atoms.dup();
+       }
 
-      /** Stores its immediate children sigs (not including NONE)
+      public static void checkParent(PrimSig parent, Pos pos, String label) throws ErrorSyntax {
+          if (parent != null && parent.isAtom != null) throw new ErrorSyntax(parent.pos, "Atom Sig cannot be used as super sig");
+          if (parent==SIGINT) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"Int\" signature");
+          if (parent==SEQIDX) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"seq/Int\" signature");
+          if (parent==STRING) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"String\" signature");
+          if (parent==NONE)   throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"none\" signature");
+    }
+
+    /** Stores its immediate children sigs (not including NONE)
        * <p> Note: if this==UNIV, then this list will always be empty, since we don't keep track of UNIV's children
        */
       private final SafeList<PrimSig> children = new SafeList<PrimSig>();
@@ -297,6 +353,8 @@ public abstract class Sig extends Expr {
          if (add) this.parent.children.add(this);
       }
 
+      public String shortLabelNoPI() { String l = super.shortLabel(); return l.startsWith("PI__") ? parent.shortLabel() : l; }
+
       /** Constructs a non-builtin sig.
        *
        * @param label - the name of this sig (it does not need to be unique)
@@ -308,10 +366,7 @@ public abstract class Sig extends Expr {
        */
       public PrimSig (String label, PrimSig parent, Attr... attributes) throws Err {
          super(((parent!=null && parent.isEnum!=null) ? parent.type : null), label, Util.append(attributes, Attr.SUBSIG));
-         if (parent==SIGINT) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"Int\" signature");
-         if (parent==SEQIDX) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"seq/Int\" signature");
-         if (parent==STRING) throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"String\" signature");
-         if (parent==NONE)   throw new ErrorSyntax(pos, "sig "+label+" cannot extend the builtin \"none\" signature");
+         checkParent(parent, pos, label);
          if (parent==null) parent=UNIV; else if (parent!=UNIV) parent.children.add(this);
          this.parent = parent;
          if (isEnum!=null && parent!=UNIV) throw new ErrorType(pos, "sig "+label+" is not a toplevel sig, so it cannot be an enum.");
@@ -364,6 +419,12 @@ public abstract class Sig extends Expr {
             if (me==null) return UNIV;
          }
       }
+
+      public Collection<String> atomSigShortLabels() throws Err {
+         Collection<String> ans = new ArrayList<String>(atomSigs().size());
+         for (AtomSig a: atomSigs()) ans.add(a.shortLabel());
+         return ans;
+      }
    }
 
    //==============================================================================================================//
@@ -408,6 +469,7 @@ public abstract class Sig extends Expr {
             temp.add(UNIV);
          } else {
             for(Sig parent:parents) {
+               if (parent.isAtom != null) throw new ErrorType(parent.pos, "Atom Sig cannot be used as super sig");
                if (!Version.experimental) {
                   if (parent==SIGINT) throw new ErrorSyntax(pos, "sig "+label+" cannot be a subset of the builtin \"Int\" signature");
                   if (parent==SEQIDX) throw new ErrorSyntax(pos, "sig "+label+" cannot be a subset of the builtin \"seq/Int\" signature");
@@ -419,6 +481,10 @@ public abstract class Sig extends Expr {
          }
          if (temp.size()==0) throw new ErrorType(pos, "Sig "+label+" must have at least one non-empty parent.");
          this.parents = temp.makeConst();
+      }
+      
+      public boolean isIntSubsetSig() { 
+          return parents.size() == 1 && parents.get(0) == Sig.SIGINT; 
       }
 
       /** {@inheritDoc} */
@@ -448,6 +514,8 @@ public abstract class Sig extends Expr {
       /** True if this is a defined field. */
       public final boolean defined;
 
+      public final Expr bound;
+
       /** The declaration that this field came from. */
       private Decl decl;
 
@@ -458,6 +526,7 @@ public abstract class Sig extends Expr {
       private Field(Pos pos, Pos isPrivate, Pos isMeta, Pos disjoint, Pos disjoint2, Sig sig, String label, Expr bound) throws Err {
          super(pos, label, sig.type.product(bound.type));
          this.defined = bound.mult() == ExprUnary.Op.EXACTLYOF;
+         this.bound = bound;
          if (sig.builtin) throw new ErrorSyntax(pos, "Builtin sig \""+sig+"\" cannot have fields.");
          if (!bound.errors.isEmpty()) throw bound.errors.pick();
          if (!this.defined && bound.hasCall()) throw new ErrorSyntax(pos, "Field \""+label+"\" declaration cannot contain a function or predicate call.");
@@ -587,4 +656,5 @@ public abstract class Sig extends Expr {
       fields.add(d);
       return f;
    }
+
 }

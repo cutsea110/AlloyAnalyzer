@@ -24,10 +24,10 @@ import java.util.Iterator;
 import java.util.List;
 
 import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.SafeList;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 
 /** Immutable; represents the type of an expression.
@@ -262,19 +262,19 @@ public final class Type implements Iterable<Type.ProductType> {
 
     public boolean is_int()       { return checkIntType(); }
     public boolean is_small_int() { return is_int() && is_small_int; }
-    
+
     private boolean checkIntType() {
         if (entries == null)
             return false;
         for (ProductType e : entries) {
-            if (e.arity() == 1 && e.get(0) == Sig.SIGINT)
+            if (e.arity() == 1 && (e.get(0) == Sig.SIGINT))
                 return true;
         }
         return false;
     }
 
     public static Type smallIntType() {
-        if (SMALL_INT == null) { 
+        if (SMALL_INT == null) {
             SMALL_INT = make(Sig.SIGINT);
             SMALL_INT.is_small_int = true;
         }
@@ -285,7 +285,7 @@ public final class Type implements Iterable<Type.ProductType> {
      * <p> This iterator will reject all modification requests.
      */
     public Iterator<ProductType> iterator() { return entries.iterator(); }
-    
+
     /** Merge "x" into the set of entries, then return the new arity bitmask.
      * <br> Precondition: entries and arities are consistent
      */
@@ -377,7 +377,7 @@ public final class Type implements Iterable<Type.ProductType> {
     public static Type removesBoolAndInt(Type old) {
         if (!old.is_bool && !old.is_int()) return old; else return make(false, old.entries, old.arities);
     }
-        
+
     /** Returns true iff ((this subsumes that) and (that subsumes this)) */
     @Override public boolean equals(Object that) {
         if (this==that) return true;
@@ -795,7 +795,7 @@ public final class Type implements Iterable<Type.ProductType> {
            uu = uu.join(u);
            Type oldans = ans;
            ans = ans.unionWithCommonArity(uu);
-           if (oldans == ans) break; // The special guarantee of unionWithCommonArity() 
+           if (oldans == ans) break; // The special guarantee of unionWithCommonArity()
                                      // allows us to use the cheaper "oldans==ans" here
                                      // instead of doing the more expensive "oldans.equals(ans)"
         }
@@ -810,13 +810,13 @@ public final class Type implements Iterable<Type.ProductType> {
             uu=uu.join(u);
             //[AM] olduu.equals(uu) never gets satisfied in some cases (e.g., when the union type
             //     contains tuples that are mutually recursive, for instance {S->T, T->S}
-            if (oldans==ans && olduu.equals(uu)) break; 
+            if (oldans==ans && olduu.equals(uu)) break;
             // The special guarantee of unionWithCommonArity() allows us to use the cheaper "oldans==ans" here
             // instead of doing the more expensive "oldans.equals(ans)"
         }
         return ans;
     }
-    
+
     /** Convert this type into a UNION of PRODUCT of sigs.
      * @throws ErrorType if it does not contain exactly one arity
      * @throws ErrorType if is_int is true
@@ -824,7 +824,7 @@ public final class Type implements Iterable<Type.ProductType> {
      */
     public Expr toExpr() throws Err {
         int arity = arity();
-        if (is_bool || arity<1) 
+        if (is_bool || arity<1)
             throw new ErrorType("Cannot convert this type into a bounding expression.");
         Expr ans = null;
         for(ProductType pt:this) {

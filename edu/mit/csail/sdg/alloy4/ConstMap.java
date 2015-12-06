@@ -15,14 +15,14 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import java.io.Serializable;
+import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
-import java.util.AbstractMap;
-import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.io.Serializable;
+import java.util.Map;
+import java.util.Set;
 
 /** Immutable; implements a map based on hashCode() and equals(); null key and values are allowed.
  *

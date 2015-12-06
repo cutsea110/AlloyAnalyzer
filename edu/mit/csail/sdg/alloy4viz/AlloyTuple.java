@@ -15,12 +15,13 @@
 
 package edu.mit.csail.sdg.alloy4viz;
 
-import java.util.Collection;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
-import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4.ConstList.TempList;
+import edu.mit.csail.sdg.alloy4.Util;
 
 /** Immutable; represents an Alloy tuple.
  *

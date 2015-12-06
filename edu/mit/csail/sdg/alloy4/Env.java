@@ -15,9 +15,9 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.LinkedHashMap;
 
 /** Mutable; implements a undoable map based on hashCode() and equals(); null key and values are allowed.
  *

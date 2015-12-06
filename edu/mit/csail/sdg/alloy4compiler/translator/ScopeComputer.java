@@ -22,14 +22,17 @@ import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.STRING;
 import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.UNIV;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-import edu.mit.csail.sdg.alloy4.A4Reporter;
+import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.Err;
-import edu.mit.csail.sdg.alloy4.ErrorAPI;
+import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
@@ -37,9 +40,16 @@ import edu.mit.csail.sdg.alloy4.UniqueNameGenerator;
 import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope.AtomRange;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope.AtomSet;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope.AtomsKind;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntSubsetScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.SubsetSig;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompUtil;
+import edu.mit.csail.sdg.alloy4compiler.translator.PartialInstance.Atom;
 
 /** Immutable; this class computes the scopes for each sig and computes the bitwidth and maximum sequence length.
  *
@@ -67,16 +77,23 @@ import edu.mit.csail.sdg.alloy4compiler.parser.CompUtil;
  */
 final class ScopeComputer {
 
+    public static final int DEFAULT_BITWIDTH = 4;
+
     // It calls A4Solution's constructor
 
     /** Stores the reporter that will receive diagnostic messages. */
-    private final A4Reporter rep;
+    private final IA4Reporter rep;
 
     /** Stores the command that we're computing the scope for. */
-    private final Command cmd;
+    final Command cmd;
 
-    /** The integer bitwidth of this solution's model; always between 1 and 30. */
-    private int bitwidth = 4;
+//    /** The integer bitwidth of this solution's model; always between 1 and 30. */
+//    private int bitwidth = 4;
+//    private final int minInt;
+//    private final int maxInt;
+//    private final int intInc;
+
+    private final IntScope intScope;
 
     /** The maximum sequence length; always between 0 and (2^(bitwidth-1))-1. */
     private int maxseq = 4;
@@ -86,6 +103,8 @@ final class ScopeComputer {
 
     /** The scope for each sig. */
     private final IdentityHashMap<PrimSig,Integer> sig2scope = new IdentityHashMap<PrimSig,Integer>();
+    /** The scope for each int subset sig. */    
+    private final IdentityHashMap<Sig.SubsetSig, IntSubsetScope> intsubset2scope = new IdentityHashMap<Sig.SubsetSig, IntSubsetScope>();
 
     /** The sig's scope is exact iff it is in exact.keySet() (the value is irrelevant). */
     private final IdentityHashMap<Sig,Sig> exact = new IdentityHashMap<Sig,Sig>();
@@ -96,13 +115,26 @@ final class ScopeComputer {
     /** This UniqueNameGenerator allows each sig's atoms to be distinct strings. */
     private final UniqueNameGenerator un = new UniqueNameGenerator();
 
+    /** Optional partial instance */
+    public final PartialInstance pi;
+
+    private final List<Pair<String, PrimSig>> newAtoms;
+
     /** Returns the scope for a sig (or -1 if we don't know). */
     public int sig2scope(Sig sig) {
-        if (sig==SIGINT) return 1<<bitwidth;
+        if (sig==SIGINT) return intScope.bitwidth != null ? intScope.bitwidth : -1;
         if (sig==SEQIDX) return maxseq;
         if (sig==STRING) return maxstring;
         Integer y = sig2scope.get(sig);
         return (y==null) ? (-1) : y;
+    }
+    
+    public IntSubsetScope intsub2scope(SubsetSig sig) {
+        return intsubset2scope.get(sig);
+    }
+
+    public List<Pair<String, PrimSig>> getNewAtoms() {
+        return new ArrayList<Pair<String,PrimSig>>(newAtoms);
     }
 
     /** Sets the scope for a sig; returns true iff the sig's scope is changed by this call. */
@@ -127,30 +159,6 @@ final class ScopeComputer {
         if (!(sig instanceof PrimSig)) throw new ErrorSyntax(pos, "Cannot specify a scope for a subset signature \""+sig+"\"");
         exact.put(sig, sig);
     }
-
-    /** Modifies the integer bitwidth of this solution's model (and sets the max sequence length to 0) */
-    private void setBitwidth(Pos pos, int newBitwidth) throws ErrorAPI, ErrorSyntax {
-        if (newBitwidth<0)  throw new ErrorSyntax(pos, "Cannot specify a bitwidth less than 0");
-        if (newBitwidth>30) throw new ErrorSyntax(pos, "Cannot specify a bitwidth greater than 30");
-        bitwidth = newBitwidth;
-        maxseq = 0;
-        sig2scope.put(SIGINT, bitwidth < 1 ? 0 : 1<<bitwidth);
-        sig2scope.put(SEQIDX, 0);
-    }
-
-    /** Modifies the maximum sequence length. */
-    private void setMaxSeq(Pos pos, int newMaxSeq) throws ErrorAPI, ErrorSyntax {
-        if (newMaxSeq > max()) throw new ErrorSyntax(pos, "With integer bitwidth of "+bitwidth+", you cannot have sequence length longer than "+max());
-        if (newMaxSeq < 0) newMaxSeq = 0; //throw new ErrorSyntax(pos, "The maximum sequence length cannot be negative.");
-        maxseq = newMaxSeq;
-        sig2scope.put(SEQIDX, maxseq);
-    }
-
-    /** Returns the largest allowed integer. */
-    private int max() { return Util.max(bitwidth); }
-
-    /** Returns the smallest allowed integer. */
-    private int min() { return Util.min(bitwidth); }
 
     //===========================================================================================================================//
 
@@ -201,6 +209,30 @@ final class ScopeComputer {
 
     //===========================================================================================================================//
 
+    /** If A has an upper bound in the partial instance, use that as a scope */
+    private boolean derive_partial_instance_scope (Iterable<Sig> sigs) throws Err {
+        boolean changed=false;
+        for(Sig s:sigs) if (!s.builtin) {
+            String sigName = s.shortLabel();
+            int currentScope = sig2scope(s);
+            List<Atom> sigUpper = pi.sigUpper(sigName);
+            int piNumAtoms = pi.atomsForType(sigName).size();
+            if (sigUpper != null) {
+                int piMaxAtoms = Math.max(piNumAtoms, sigUpper.size());
+                if (currentScope != piMaxAtoms) {
+                    sig2scope(s, piMaxAtoms);
+                    changed = true;
+                }
+            } else if (piNumAtoms > 0 && piNumAtoms > currentScope) {
+                sig2scope(s, piNumAtoms);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    //===========================================================================================================================//
+
     /** If A is not toplevel, and we haven't been able to derive its scope yet, then give it its parent's scope. */
     private boolean derive_scope_from_parent (Iterable<Sig> sigs) throws Err {
         boolean changed=false;
@@ -227,48 +259,84 @@ final class ScopeComputer {
         // Bump up the scope if the sum of children exceed the scope for this sig
         if (n<lower) {
            if (isExact)
-              rep.scope("Sig "+sig+" scope raised from =="+n+" to be =="+lower+"\n");
+               rep.scope("Sig "+sig+" scope raised from =="+n+" to be =="+lower+"\n");
            else
               rep.scope("Sig "+sig+" scope raised from <="+n+" to be <="+lower+"\n");
            n=lower;
            sig2scope.put(sig, n);
         }
+
+        String sigName = sig.shortLabel();
+
+//        //[PI]
+        List<Atom> piAtoms = pi.atomsForType(sigName);
+
         // Add special overrides for "exactly" sigs
         if (!isExact && cmd.additionalExactScopes.contains(sig)) {
             isExact=true; rep.scope("Sig "+sig+" forced to have exactly "+n+" atoms.\n"); makeExact(Pos.UNKNOWN, sig);
         }
         // Create atoms
+        //TODO: what if it's not topLevel but also not abstract???
         if (n>lower && (isExact || sig.isTopLevel())) {
             // Figure out how many new atoms to make
             n = n-lower;
-            // Pick a name for them
-            String name=sig.label;
-            if (name.startsWith("this/")) name=name.substring(5);
-            name=un.make(name);
-            // Now, generate each atom using the format "SIGNAME$INDEX"
-            // By prepending the index with 0 so that they're the same width, we ensure they sort lexicographically.
-            StringBuilder sb=new StringBuilder();
-            for(int i=0; i<n; i++) {
-               String x = sb.delete(0, sb.length()).append(name).append('$').append(i).toString();
-               atoms.add(x);
-               lower++;
+            // Pick a name for them TODO [PI]: check
+            String piAtomName = isPiSig(sig);
+            if (piAtomName != null) {
+                assert n == 1;
+                atoms.add(piAtomName);
+                lower++;
+            } else {
+                String name = un.make(sigName);
+                // Now, generate each atom using the format "SIGNAME$INDEX"
+                for (int i = 0; i < n; i++) {
+                    String x;
+                    if (i < sig.atomSigs().size()) {
+                        x = sig.atomSigs().get(i).shortLabel();
+                    } else {
+                        x = name + '$' + i; //(i < piAtoms.size()) ? piAtoms.get(i).toString() :
+                        if (atoms.contains(x)) x = name + '$' + (i + piAtoms.size());
+                        newAtoms.add(new Pair<String, PrimSig>(x, sig));
+                    }
+                    atoms.add(x);
+                    lower++;
+                }
             }
         }
         return lower;
     }
 
+    private String isPiSig(PrimSig sig) {
+        if (sig.isAtom != null) { return sig.shortLabel(); }
+        if (sig.isOne == null) return null;
+        String[] arr = sig.shortLabel().split("__");
+        if (arr.length < 3) return null;
+        if (!"PI".equalsIgnoreCase(arr[0])) return null;
+        return sig.parent.shortLabel() + '$' + arr[arr.length-1];
+    }
+
     //===========================================================================================================================//
 
-    /** Compute the scopes, based on the settings in the "cmd", then log messages to the reporter. */
-    private ScopeComputer(A4Reporter rep, Iterable<Sig> sigs, Command cmd) throws Err {
+    /** Compute the scopes, based on the settings in the "cmd", then log messages to the reporter.
+     * @param pi */
+    private ScopeComputer(IA4Reporter rep, Iterable<Sig> sigs, Command command, PartialInstance pi) throws Err {
         this.rep = rep;
-        this.cmd = cmd;
-        boolean shouldUseInts = CompUtil.areIntsUsed(sigs, cmd);
+        this.pi = pi == null ? new PartialInstance() : pi;
+        this.cmd = resolveIntScopes(pi, sigs, command);
+        this.intScope = cmd.intScope;
+        this.newAtoms = new ArrayList<Pair<String,PrimSig>>();
+
         // Process each sig listed in the command
-        for(CommandScope entry:cmd.scope) {
-            Sig s = entry.sig;
-            int scope = entry.startingScope;
-            boolean exact = entry.isExact;
+        for(CommandScope sigScope:cmd.scope) {
+            Sig s = sigScope.sig;
+            IntSubsetScope intSubScope = null;
+            SubsetSig ss = (s instanceof SubsetSig) ? (SubsetSig)s : null;
+            int scope = sigScope.startingScope();
+            boolean exact = sigScope.isExact();
+            if (sigScope instanceof IntSubsetScope) {
+                intSubScope = (IntSubsetScope) sigScope;
+                if (!s.isIntSubsetSig()) throw new ErrorSyntax(sigScope.pos, "Cannot specify int scope on a sig that is not an Int subset sig");
+            }
             if (s==UNIV) throw new ErrorSyntax(cmd.pos, "You cannot set a scope on \"univ\".");
             if (s==SIGINT) throw new ErrorSyntax(cmd.pos,
                     "You can no longer set a scope on \"Int\". "
@@ -291,7 +359,11 @@ final class ScopeComputer {
                 "Sig \""+s+"\" has the multiplicity of \"lone\", so its scope must 0 or 1, and cannot be "+scope);
             if (s.isSome!=null && scope<1) throw new ErrorSyntax(cmd.pos,
                 "Sig \""+s+"\" has the multiplicity of \"some\", so its scope must 1 or above, and cannot be "+scope);
-            sig2scope(s, scope);
+            if (ss != null && intSubScope != null) {
+                intsubset2scope.put(ss, intSubScope);
+            } else {
+                sig2scope(s, scope);
+            }
             if (exact) makeExact(cmd.pos, s);
         }
         // Force "one" sigs to be exactly one, and "lone" to be at most one
@@ -300,29 +372,123 @@ final class ScopeComputer {
         }
         // Derive the implicit scopes
         while(true) {
-            if (derive_abstract_scope(sigs))    { do {} while(derive_abstract_scope(sigs));     continue; }
-            if (derive_overall_scope(sigs))     { do {} while(derive_overall_scope(sigs));      continue; }
-            if (derive_scope_from_parent(sigs)) { do {} while(derive_scope_from_parent(sigs));  continue; }
+            if (derive_partial_instance_scope(sigs)) { do {} while(derive_partial_instance_scope(sigs)); continue; }
+            if (derive_abstract_scope(sigs))         { do {} while(derive_abstract_scope(sigs));         continue; }
+            if (derive_overall_scope(sigs))          { do {} while(derive_overall_scope(sigs));          continue; }
+            if (derive_scope_from_parent(sigs))      { do {} while(derive_scope_from_parent(sigs));      continue; }
             break;
         }
-        // Set the initial scope on "int" and "Int" and "seq"
-        int maxseq=cmd.maxseq, bitwidth=cmd.bitwidth;
-        if (bitwidth<0) { bitwidth = (shouldUseInts ? 4 : 0); } 
-        setBitwidth(cmd.pos, bitwidth);
+        
+        if (intScope.bitwidth == null || intScope.atoms == null) throw new ErrorFatal("IntScope not computed properly");
+
+        this.sig2scope.put(SIGINT, intScope.atoms.size());
+        this.sig2scope.put(SEQIDX, 0);
+
+        int maxInt = intScope.atoms.max();
+        int maxseq = cmd.maxseq;
         if (maxseq<0) {
             if (cmd.overall>=0) maxseq=cmd.overall; else maxseq=4;
-            int max = Util.max(bitwidth);
-            if (maxseq > max) maxseq = max;
+            if (maxseq > maxInt) maxseq = maxInt;
         }
-        setMaxSeq(cmd.pos, maxseq);
+        if (maxseq > maxInt) maxseq = maxInt; //TODO throw new ErrorSyntax(pos, "With integer bitwidth of "+bitwidth+", you cannot have sequence length longer than "+maxInt);
+        if (maxseq < 0) maxseq = 0; //throw new ErrorSyntax(pos, "The maximum sequence length cannot be negative.");
+        this.maxseq = maxseq;
+        sig2scope.put(SEQIDX, maxseq);
+
         // Generate the atoms and the universe
+        Set<String> intAtoms = new HashSet<String>(); 
         for(Sig s:sigs) if (s.isTopLevel()) computeLowerBound((PrimSig)s);
-        int max = max(), min = min();
-        if (max >= min) for(int i=min; i<=max; i++) atoms.add(""+i);
+        for (int i : intScope.enumerate()) intAtoms.add(""+i);
+        for (CommandScope cs : cmd.scope) if (cs instanceof IntSubsetScope) {
+            for (int i : ((IntSubsetScope) cs).intScope.enumerate()) 
+                intAtoms.add(""+i);
+        }
+        atoms.addAll(intAtoms);
     }
 
     //===========================================================================================================================//
 
+    private static Command resolveIntScopes(PartialInstance pi, Iterable<Sig> sigs, Command cmd) throws Err {
+        boolean shouldUseInts = CompUtil.areIntsUsed(sigs, cmd);
+        Collection<Integer> intLiterals = CompUtil.extractIntLiterals(sigs, cmd);
+        IntScope newIntScope = resolveIntScope(cmd.intScope, pi, shouldUseInts, intLiterals);
+        cmd = cmd.change(newIntScope);
+        List<CommandScope> scope = new ArrayList<CommandScope>(cmd.scope.size());
+        PartialInstance emptyPI = new PartialInstance();
+        for (CommandScope cs : cmd.scope) {
+            if (cs instanceof IntSubsetScope) {
+                IntSubsetScope intSubsetScope = (IntSubsetScope) cs;
+                scope.add(intSubsetScope.change(resolveIntScope(intSubsetScope.intScope, emptyPI, shouldUseInts, intLiterals)));
+            } else if (cs.sig.isIntSubsetSig()) {
+                IntSubsetScope intSubScope = (cs instanceof IntSubsetScope) 
+                        ? (IntSubsetScope) cs 
+                        : new IntSubsetScope(cs.pos, cs.sig, IntScope.mkBitwidth(cs.startingScope()));
+                scope.add(intSubScope.change(resolveIntScope(intSubScope.intScope, emptyPI, shouldUseInts, intLiterals)));                        
+            } else {
+                scope.add(cs);
+            }
+        }
+        cmd = cmd.change(ConstList.make(scope));
+        return cmd;
+    }
+    
+    private static IntScope resolveIntScope(IntScope intScope, PartialInstance pi, boolean shouldUseInts, Collection<Integer> intLiterals) throws Err {
+        IntScope ans = intScope != null ? intScope : IntScope.mkEmpty();
+
+        // 1. if atoms are not set and partial instance is given,
+        //    set atoms to AtomSet with atoms from the partial instance
+        int[] piInts;
+        if (ans.atoms == null && pi != null && (piInts=pi.ints()) != null) {
+            ans = ans.withAtoms(new IntScope.AtomSet(null, piInts));
+        }
+        
+        int bw = ans.bitwidth != null ? ans.bitwidth : (shouldUseInts ? DEFAULT_BITWIDTH : 0);
+
+        // 2. compute and set atoms
+        if (ans.atoms == null || ans.atoms instanceof IntScope.AtomsFullBitwidth) {
+            // default is FullBitwidth, but enumerate now and represent it as AtomRange
+            AtomsKind atoms = bw > 0 ? new AtomRange(null, Util.min(bw), Util.max(bw), 1)
+                                     : new AtomSet(null, new int[0]);
+            ans = ans.withAtoms(atoms);
+        } else if (ans.atoms instanceof IntScope.AtomSet) {
+            // add literals if need be
+            AtomSet as = (AtomSet)ans.atoms;
+            if (as.includeLiterals) {
+                Collection<Integer> ints = new ArrayList<Integer>(intLiterals.size() + as.ints.size());
+                ints.addAll(intLiterals);
+                ints.addAll(as.ints);
+                ans = ans.withAtoms(new IntScope.AtomSet(null, ints));
+            }
+        } else if (ans.atoms instanceof IntScope.AtomLiterals) {
+            // convert to AtomSet
+            ans = ans.withAtoms(new IntScope.AtomSet(null, intLiterals));
+        }
+        
+        // 3. compute bitwidth
+        //   - if explicitly set, keep it; otherwise convert literals to fit the bitwidth
+        if (ans.bitwidth == null) {
+            ans = ans.withBitwidth(Math.max(bw, Util.minBw(ans.atoms.min(), ans.atoms.max())));
+        } else {
+            Collection<Integer> ints = new ArrayList<Integer>(ans.atoms.size());
+            int min = Util.min(ans.bitwidth);
+            int max = Util.max(ans.bitwidth);
+            if (ans.atoms.min() < min || ans.atoms.max() > max) {
+                int mask = ~(-1 << ans.bitwidth);
+                for (int i : ans.atoms.enumerateAccending()) {
+                    if (i < min || i > max) {
+                        i = i & mask;
+                        if (i > max) i = (i - max - 1) + min;
+                        else if (i < min) i = max - (min - i - 1);
+                    }
+                    ints.add(i);
+                }
+                ans = ans.withAtoms(new IntScope.AtomSet(null, ints));
+            }
+        }
+        
+        return ans;
+    }
+    
     /** Computes the scopes for each sig and computes the bitwidth and maximum sequence length.
      *
      * <p> The scopes are determined as follows:
@@ -347,13 +513,16 @@ final class ScopeComputer {
      *
      * <p> Please see ScopeComputer.java for the exact rules for deriving the missing scopes.
      */
-    static Pair<A4Solution,ScopeComputer> compute (A4Reporter rep, A4Options opt, Iterable<Sig> sigs, Command cmd) throws Err {
-        ScopeComputer sc = new ScopeComputer(rep, sigs, cmd);
+    static Pair<A4Solution,ScopeComputer> compute (IA4Reporter rep, A4Options opt, Iterable<Sig> sigs, Command cmd) throws Err {
+        PartialInstance pi = new PartialInstanceParser(opt.partialInstance).parse();
+        ScopeComputer sc = new ScopeComputer(rep, sigs, cmd, pi);
+        cmd = sc.cmd;
         Set<String> set = cmd.getAllStringConstants(sigs);
         if (sc.maxstring>=0 && set.size()>sc.maxstring) rep.scope("Sig String expanded to contain all "+set.size()+" String constant(s) referenced by this command.\n");
         for(int i=0; set.size()<sc.maxstring; i++) set.add("\"String" + i + "\"");
         sc.atoms.addAll(set);
-        A4Solution sol = new A4Solution(cmd.toString(), sc.bitwidth, sc.maxseq, set, sc.atoms, rep, opt, cmd.expects);
+        A4Solution sol = new A4Solution(cmd.toString(), sc.intScope, sc.maxseq, set, sc.atoms, rep, opt, cmd.expects, pi);
         return new Pair<A4Solution,ScopeComputer>(sol, sc);
     }
+
 }

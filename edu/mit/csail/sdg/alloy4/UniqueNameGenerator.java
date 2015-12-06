@@ -15,8 +15,8 @@
 
 package edu.mit.csail.sdg.alloy4;
 
-import java.util.Set;
 import java.util.HashSet;
+import java.util.Set;
 
 /** This generates unique names based on names provided by the caller.
  *

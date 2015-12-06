@@ -16,8 +16,10 @@
 package edu.mit.csail.sdg.alloy4whole;
 
 import static edu.mit.csail.sdg.alloy4.A4Reporter.NOP;
+
 import java.util.LinkedHashSet;
 import java.util.Set;
+
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4compiler.ast.Attr;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;

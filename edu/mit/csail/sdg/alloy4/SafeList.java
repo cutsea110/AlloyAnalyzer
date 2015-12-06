@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+
 import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 
 /** This list allows add() but disallows remove() and set(); null values are allowed.

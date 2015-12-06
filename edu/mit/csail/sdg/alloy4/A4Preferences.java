@@ -13,6 +13,7 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.DefaultSingleSelectionModel;
 import javax.swing.Icon;
+import javax.swing.JOptionPane;
 
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
 
@@ -66,6 +67,8 @@ public class A4Preferences {
       private final T defaultValue;
 
       public ChoicePref(String id, T[] validChoices, T... defValueCandidates)                       { this(id, Arrays.asList(validChoices), defValueCandidates); }
+      public ChoicePref(String id, String title, T[] validChoices, T... defValueCandidates)         { this(id, title, Arrays.asList(validChoices), defValueCandidates); }
+      public ChoicePref(String id, String title, String desc, T[] validChoices, T... defValueCands) { this(id, title, desc, Arrays.asList(validChoices), defValueCands); }
       public ChoicePref(String id, Iterable<T> validChoices, T... defValueCandidates)               { this(id, id, id, validChoices, defValueCandidates); }
       public ChoicePref(String id, String title, Iterable<T> validChoices, T... defValueCandidates) { this(id, title, title, validChoices, defValueCandidates); }
       public ChoicePref(String id, String title, String desc, Iterable<T> validChoices, T... defValueCandidates) {
@@ -83,6 +86,10 @@ public class A4Preferences {
 
       @Override public void setSelectedIndex(int index) { set(validChoices().get(index)); }
       @Override public int getSelectedIndex()           { return index(get()); }
+      
+//      public ChoiceAction getDialogAction(String title) { return new ChoiceAction(this, title); }
+//      public ChoiceAction getTitleAction()              { return getDialogAction(title); }
+//      public ChoiceAction getDescAction()               { return getDialogAction(desc); }
 
       protected Object[] checkChoices(Iterable<T> validChoices, T[] defValueCandidates) {
          List<T> lst = new ArrayList<T>();
@@ -121,7 +128,7 @@ public class A4Preferences {
 
       public DelayedChoicePref(String id)                            { this(id, id, id); }
       public DelayedChoicePref(String id, String title)              { this(id, title, title); }
-      public DelayedChoicePref(String id, String title, String desc) { super(id, title, desc, null, ((T)new Object[]{})); }
+      public DelayedChoicePref(String id, String title, String desc) { super(id, title, desc, (T[])null, ((T)new Object[]{})); }
 
       public DelayedChoicePref(String id, Iterable<T> validChoices, T... defValueCandidates)                            { super(id, validChoices, defValueCandidates); }
       public DelayedChoicePref(String id, String title, Iterable<T> validChoices, T... defValueCandidates)              { super(id, title, validChoices, defValueCandidates); }
@@ -139,22 +146,40 @@ public class A4Preferences {
 
    /** This reads and writes IntChoice-valued Java persistent preferences. */
    public static class IntChoicePref extends ChoicePref<Integer> {
+      private final boolean allowOtherChoices;
+
       public IntChoicePref(String id, Iterable<Integer> validChoices, Integer defaultValue) {
          super(id, validChoices, defaultValue);
+         this.allowOtherChoices = false;
       }
       public IntChoicePref(String id, String title, Iterable<Integer> validChoices, Integer defaultValue) {
-         super(id, title, validChoices, defaultValue);
+          this(id, title, validChoices, defaultValue, false);
       }
-      public IntChoicePref(String id, String title, String desc, Iterable<Integer> validChoices, Integer defaultValue) {
+      public IntChoicePref(String id, String title, Iterable<Integer> validChoices, Integer defaultValue, boolean allowOther) {
+         super(id, title, validChoices, defaultValue);
+         this.allowOtherChoices = allowOther;
+      }
+      public IntChoicePref(String id, String title, String desc, Iterable<Integer> validChoices, Integer defaultValue, boolean allowOther) {
          super(id, title, desc, validChoices, defaultValue);
+         this.allowOtherChoices = allowOther;
       }
 
-      public static IntChoicePref range(String id, int min, int step, int max, int defaultValue) { return range(id, id, id, min, step, max, defaultValue); }
-      public static IntChoicePref range(String id, String title, int min, int step, int max, int defaultValue) { return range(id, title, title, min, step, max, defaultValue); }
-      public static IntChoicePref range(String id, String title, String desc, int min, int step, int max, int defaultValue) {
+      public static IntChoicePref range(String id, int min, int step, int max, int defaultValue) { return range(id, id, id, min, step, max, defaultValue, false); }
+      public static IntChoicePref range(String id, String title, int min, int step, int max, int defaultValue) { return range(id, title, title, min, step, max, defaultValue, false); }
+      public static IntChoicePref range(String id, String title, String desc, int min, int step, int max, int defaultValue, boolean allowOther) {
          ArrayList<Integer> lst = new ArrayList<Integer>();
          for (int x = min; x <= max; x += step) { lst.add(x); }
-         return new IntChoicePref(id, title, desc, lst, defaultValue);
+         return new IntChoicePref(id, title, desc, lst, defaultValue, allowOther);
+      }
+
+      @Override protected Integer parse(String str) {
+         if (!allowOtherChoices)
+             return super.parse(str);
+         else try {
+             return Integer.parseInt(str);
+         } catch (NumberFormatException e) {
+             return null;
+         }
       }
    }
 
@@ -225,7 +250,13 @@ public class A4Preferences {
       private int bound (int n) { return n<min ? min : (n>max? max : n); }
 
       /** Make a new IntPref object with the given id; you must ensure max >= min, but def does not have to be between min..max */
-      public IntPref (String id, int min, int def, int max) {super(id); this.min=min; this.def=def; this.max=max;}
+      public IntPref (String id, int min, int def, int max)                            { this(id, id, id, min, def, max); }
+      public IntPref (String id, String title, int min, int def, int max)              { this(id, title, title, min, def, max); }
+      public IntPref (String id, String title, String desc, int min, int def, int max) { super(id, title, desc); this.min=min; this.def=def; this.max=max;}
+
+      public IntAction getAction(String title) { return new IntAction(this, title); }
+      public IntAction getTitleAction()        { return getAction(title); }
+      public IntAction getDescAction()         { return getAction(desc); }
 
       @Override protected String serialize(Integer value) { return "" + bound(value); }
       @Override protected Integer parse(String str)       { return bound(Integer.parseInt(str)); }
@@ -246,6 +277,64 @@ public class A4Preferences {
 
       public void actionPerformed(ActionEvent e) { pref.toggle(); }
    }
+
+//   /** A simple action tied to a boolean preference */
+//   @SuppressWarnings("rawtypes")
+//   public static final class ChoiceAction extends AbstractAction {
+//    private final ChoicePref pref;
+//
+//      public ChoiceAction(ChoicePref pref)              { this(pref, null, null); }
+//      public ChoiceAction(ChoicePref pref, String name) { this(pref, name, null); }
+//      public ChoiceAction(ChoicePref pref, String name, Icon icon) {
+//         super(name, icon);
+//         this.pref = pref;
+//      }
+//
+//      public void actionPerformed(ActionEvent e) {
+//          Object name = getValue(Action.NAME);
+//          Object val = JOptionPane.showInputDialog(null,
+//                  String.format("Option: %s\nCurrent value: %s\nEnter new value:", name, pref.get()),
+//                  "Set option value", JOptionPane.QUESTION_MESSAGE, null, null, null);
+//          if (val != null) {
+//              try {
+//                  pref.set(Integer.parseInt(val.toString()));
+//              } catch (NumberFormatException ex) {
+//                  JOptionPane.showMessageDialog(null, "'" + val + "' is not a number");
+//              } catch (Exception ex) {
+//                  JOptionPane.showMessageDialog(null, "Invalid value for the '" + name + "' option: " + val);
+//              }
+//          }
+//      }
+//   }
+
+   /** A simple action tied to a boolean preference */
+   public static final class IntAction extends AbstractAction {
+      private final IntPref pref;
+
+      public IntAction(IntPref pref)              { this(pref, null, null); }
+      public IntAction(IntPref pref, String name) { this(pref, name, null); }
+      public IntAction(IntPref pref, String name, Icon icon) {
+         super(name, icon);
+         this.pref = pref;
+      }
+
+      public void actionPerformed(ActionEvent e) {
+          Object name = getValue(Action.NAME);
+          Object val = JOptionPane.showInputDialog(null,
+                  String.format("Option: %s\nCurrent value: %s\nEnter new value:", name, pref.get()),
+                  "Set option value", JOptionPane.QUESTION_MESSAGE, null, null, null);
+          if (val != null) {
+              try {
+                  pref.set(Integer.parseInt(val.toString()));
+              } catch (NumberFormatException ex) {
+                  JOptionPane.showMessageDialog(null, "'" + val + "' is not a number");
+              } catch (Exception ex) {
+                  JOptionPane.showMessageDialog(null, "Invalid value for the '" + name + "' option: " + val);
+              }
+          }
+      }
+   }
+
 
    // ======== The Preferences ======================================================================================//
    // ======== Note: you must make sure each preference has a unique key ============================================//
@@ -283,7 +372,7 @@ public class A4Preferences {
 
    /** The latest font size of the Alloy Analyzer. */
    public static final IntChoicePref FontSize = new IntChoicePref("FontSize", "Font size",
-         Arrays.asList(9,10,11,12,14,16,18,20,22,24,26,28,32,36,40,44,48,54,60,66,72), 14);
+         Arrays.asList(9,10,11,12,14,16,18,20,22,24,26,28,32,36,40,44,48,54,60,66,72), 14, true);
 
    /** The latest font name of the Alloy Analyzer. */
    public static final StringChoicePref FontName = new StringChoicePref("FontName", "Font family",
@@ -292,6 +381,14 @@ public class A4Preferences {
 
    /** The latest tab distance of the Alloy Analyzer. */
    public static final IntChoicePref TabSize = IntChoicePref.range("TabSize", "Tab size", 1, 1, 16, 4);
+
+   /** Convert tabs to spaces */
+   public static final BooleanPref UseSpacesForTabs = new BooleanPref("UseSpacesForTabs", "Use spaces instead of tabs", false);
+
+   /** Key bindings */
+   public static final StringChoicePref KeyBindings = new StringChoicePref("KeyBindings", "Keyboard bindings",
+         Arrays.asList(new String[] { "Default", "Emacs" }), "Default");
+
 
    /** The latest welcome screen that the user has seen. */
    public static final BooleanPref Welcome = new BooleanPref("Welcome", "Show welcome message at start up");
@@ -303,13 +400,32 @@ public class A4Preferences {
    /** Whether syntax highlighting should be disabled or not. */
    public static final BooleanPref SyntaxDisabled = new BooleanPref("SyntaxHighlightingDisabled", "Disable syntax highlighting");
 
+//   /** The number of recursion unrolls. */
+//   public static final IntChoicePref Unrolls = new IntChoicePref("Unrolls", "Recursion depth", Arrays.asList(-1, 0, 1, 2, 3), -1) {
+//      @Override public Object renderValueShort(Integer value) { return (value != null && value.intValue() == -1) ? "disabled" : value; }
+//   };
    /** The number of recursion unrolls. */
-   public static final IntChoicePref Unrolls = new IntChoicePref("Unrolls", "Recursion depth", Arrays.asList(-1, 0, 1, 2, 3), -1) {
-      @Override public Object renderValueShort(Integer value) { return (value != null && value.intValue() == -1) ? "disabled" : value; }
-   };
+   public static final IntPref Unrolls = new IntPref("Unrolls", "Recursion depth", "Recursion depth", -1, -1, 10);
+//   {
+//      @Override public Object renderValueShort(Integer value) { return (value != null && value.intValue() == -1) ? "disabled" : value; }
+//   };
 
    /** The skolem depth. */
    public static final IntChoicePref SkolemDepth = new IntChoicePref("SkolemDepth3", "Skolem depth", Arrays.asList(0, 1, 2, 3, 4), 1);
+
+   /** Create relations for atoms. */
+   //public static final BooleanPref CreateAtomRelations = new BooleanPref("CreateAtomRelations", "Create relations for atoms", true);
+
+   /** Use higher-order solver */
+   public static final BooleanPref UseHOLSolver = new BooleanPref("UseHOLSolver", "Use higher-order solver", true);
+   public static final BooleanPref HOLForceIncInd = new BooleanPref("HOLForceIncInd", "Force incremental CEGIS induction", true);
+   public static final IntPref HOLMaxIter = new IntPref("HOLMaxIter", "Max CEGIS iterations", "Maximum number of CEGIS iterations (per solver)", -1, 100, 10000000);
+   public static final BooleanPref HOLSavePI = new BooleanPref("HOLSavePI", "Save CEGIS partial instances as", true);
+   public static final BooleanPref HOLSaveFormulas = new BooleanPref("HOLSaveFormulas", "Save CEGIS formulas as", true);
+   public static final ChoicePref<InstFormat> HOLSaveCandidates = new ChoicePref<InstFormat>("HOLSaveCand", "Save CEGIS candidates as",
+           InstFormat.values(), InstFormat.VIZ);
+   public static final ChoicePref<InstFormat> HOLSaveCex = new ChoicePref<InstFormat>("HOLSaveCex", "Save CEGIS counterexamples as",
+           InstFormat.values(), InstFormat.VIZ);
 
    /** The unsat core minimization strategy. */
    private static final String[] coreMinimizationLabels = new String[] {
@@ -363,6 +479,13 @@ public class A4Preferences {
    /** Automatically infer partial instance from model */
    public static final BooleanPref InferPartialInstance = new BooleanPref("InferPartialInstance", "Infer partial instance");
 
+   /** Number of SAT solver threads */
+   public static final IntChoicePref SolverThreads = new IntChoicePref("SolverNumThreads", "Number of SAT solver threads",
+           Arrays.asList(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024), 4);
+
+   /** Sharing mode between solver threads: true -> share clauses; false -> no clause sharing */
+   public static final BooleanPref SolverThreadsShareClauses = new BooleanPref("SolverThreadsShareClauses", "Share clauses between solver threads", false);
+
    public static final DelayedChoicePref<SatSolver> Solver = new DelayedChoicePref<SatSolver>("SatSolver2", "Solver",
          SatSolver.values(), SatSolver.SAT4J) {
       @Override protected String serialize(SatSolver value) { return value.id(); }
@@ -373,11 +496,21 @@ public class A4Preferences {
       @Override protected String serialize(Verbosity value) { return value.id; }
    };
 
+   public enum InstFormat {
+       VIZ("Viz"), TEXT("Text"), NOTHING("Nothing");
+       private final String id;
+       private final String label;
+       private InstFormat(String label) { this.id = this.name(); this.label = label; }
+       public final String toString()   { return label; }
+       public final String id()         { return id; }
+   }
+
    public enum Verbosity {
       /** Level 0. */  DEFAULT("0", "low"),
       /** Level 1. */  VERBOSE("1", "medium"),
       /** Level 2. */  DEBUG("2", "high"),
-      /** Level 3. */  FULLDEBUG("3", "debug");
+      /** Level 3. */  FULLDEBUG("3", "debug"),
+      /** Level 3. */  TRACE("4", "trace");
       /** Returns true if it is greater than or equal to "other". */
       public boolean geq(Verbosity other) { return ordinal() >= other.ordinal(); }
       /** This is a unique String for this value; it should be kept consistent in future versions. */
@@ -390,21 +523,21 @@ public class A4Preferences {
       /** Returns the human-readable label for this enum value. */
       @Override public final String toString() { return label; }
    }
-   
-   public static Pref<?>[] nonUserPrefs = new Pref<?>[] { 
+
+   public static Pref<?>[] nonUserPrefs = new Pref<?>[] {
        AnalyzerX, AnalyzerHeight, AnalyzerWidth, AnalyzerY, Model0, Model1, Model2, Model3 };
-   
+
    public static List<Pref<?>> allPrefs() {
       List<Pref<?>> ans = new ArrayList<A4Preferences.Pref<?>>();
       Class<A4Preferences> self = A4Preferences.class;
       for (Field f : self.getDeclaredFields()) {
          if (Pref.class.isAssignableFrom(f.getType())) {
-            try { ans.add((Pref<?>) f.get(self)); } catch (Exception e) {} 
+            try { ans.add((Pref<?>) f.get(self)); } catch (Exception e) {}
          }
       }
       return ans;
    };
-   
+
    public static List<Pref<?>> allUserPrefs() {
        List<Pref<?>> ans = allPrefs();
        for (Pref<?> p: nonUserPrefs) ans.remove(p);

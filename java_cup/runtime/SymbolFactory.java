@@ -23,6 +23,7 @@ public interface SymbolFactory {
      */
     public Symbol newSymbol(String name, int id, Symbol left, Symbol right, Object value);
     public Symbol newSymbol(String name, int id, Symbol left, Symbol right);
+    public Symbol newSymbol(String name, int id, Object value);
     /**
      * Construction with left/right propagation switched off
      */

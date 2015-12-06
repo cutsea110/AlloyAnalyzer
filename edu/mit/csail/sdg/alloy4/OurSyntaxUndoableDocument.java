@@ -15,10 +15,11 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import static java.lang.System.arraycopy;
+
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
-import static java.lang.System.arraycopy;
 
 /** Graphical syntax-highlighting StyledDocument with undo+redo support.
  *

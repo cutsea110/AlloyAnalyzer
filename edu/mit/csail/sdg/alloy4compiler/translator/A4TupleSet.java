@@ -17,9 +17,10 @@ package edu.mit.csail.sdg.alloy4compiler.translator;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import edu.mit.csail.sdg.alloy4.ErrorAPI;
+
 import kodkod.instance.Tuple;
 import kodkod.instance.TupleSet;
+import edu.mit.csail.sdg.alloy4.ErrorAPI;
 
 /** Immutable; represents a collection of Alloy tuples; comparison is by identity rather than by value. */
 
@@ -31,12 +32,16 @@ public final class A4TupleSet implements Iterable<A4Tuple> {
     /** The A4Solution that this came from. */
     private final A4Solution sol;
 
+    public final boolean wasOverflow;
+
     /** Construct a TupleSet from the kodkod TupleSet, while renaming each atom using the atom2name map in sol.
      * <br> NOTE: caller must ensure the Kodkod tupleset is not modified, since we expect the resulting A4Tupleset to be constant.
      */
-    A4TupleSet(TupleSet tuples, A4Solution sol) {
+    A4TupleSet(TupleSet tuples, A4Solution sol) { this(tuples, sol, false); }
+    A4TupleSet(TupleSet tuples, A4Solution sol, boolean wasOverflow) {
         this.tuples = tuples;
         this.sol = sol;
+        this.wasOverflow = wasOverflow;
     }
 
     /** Return the underlying Kodkod tupleset. */
@@ -111,6 +116,8 @@ public final class A4TupleSet implements Iterable<A4Tuple> {
             if (sb.length()>1) sb.append(", ");
             sb.append(t);
         }
-        return sb.append('}').toString();
+        sb.append('}');
+        if (this.wasOverflow) sb.append(" (overflows) ");
+        return sb.toString();
     }
 }

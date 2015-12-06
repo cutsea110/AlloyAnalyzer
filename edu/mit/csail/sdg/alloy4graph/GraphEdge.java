@@ -15,20 +15,21 @@
 
 package edu.mit.csail.sdg.alloy4graph;
 
+import static edu.mit.csail.sdg.alloy4graph.Artist.getBounds;
+import static edu.mit.csail.sdg.alloy4graph.Graph.esc;
+import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopA;
+import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopGL;
+import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopGR;
+import static java.lang.StrictMath.PI;
+import static java.lang.StrictMath.atan2;
+import static java.lang.StrictMath.cos;
+import static java.lang.StrictMath.sin;
+import static java.lang.StrictMath.toRadians;
+
 import java.awt.Color;
 import java.awt.geom.CubicCurve2D;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Rectangle2D;
-import static java.lang.StrictMath.PI;
-import static java.lang.StrictMath.sin;
-import static java.lang.StrictMath.cos;
-import static java.lang.StrictMath.atan2;
-import static java.lang.StrictMath.toRadians;
-import static edu.mit.csail.sdg.alloy4graph.Artist.getBounds;
-import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopA;
-import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopGL;
-import static edu.mit.csail.sdg.alloy4graph.Graph.selfLoopGR;
-import static edu.mit.csail.sdg.alloy4graph.Graph.esc;
 
 /** Mutable; represents a graphical edge.
  *

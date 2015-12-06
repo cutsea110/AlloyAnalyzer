@@ -43,7 +43,9 @@ import edu.mit.csail.sdg.alloy4.XMLNode;
 import edu.mit.csail.sdg.alloy4compiler.ast.Attr;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.AtomSig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.SubsetSig;
@@ -93,6 +95,18 @@ public final class A4SolutionReader {
         return tmp.isEmpty();
     }
 
+    private IntScope parseIntScope(XMLNode node) throws Err {
+        IntScope ans = IntScope.mkEmpty();
+        ans = ans.withBitwidth(Integer.parseInt(node.getAttribute("bitwidth", null)));
+        boolean first = true;
+        for (XMLNode atomsNode : node.getChildren("atoms")) {
+            if (!first) throw new ErrorFatal("Expected at most one <atoms> node inside <intscope>");
+            ans = ans.withAtoms(IntScope.AtomsKind.fromXML(atomsNode));
+            first = false;
+        }
+        return ans;
+    }
+
     /** Parse tuple. */
     private Tuple parseTuple(XMLNode tuple, int arity) throws Err {
         Tuple ans = null;
@@ -124,6 +138,7 @@ public final class A4SolutionReader {
         if (node==null) throw new IOException("Unknown SigID "+id+" encountered.");
         if (!node.is("sig")) throw new IOException("ID "+id+" is not a sig.");
         String label   = label(node);
+        boolean isAtom  = yes(node,"atomsig");
         Attr isAbstract = yes(node,"abstract") ? Attr.ABSTRACT : null;
         Attr isOne      = yes(node,"one")      ? Attr.ONE      : null;
         Attr isLone     = yes(node,"lone")     ? Attr.LONE     : null;
@@ -157,7 +172,8 @@ public final class A4SolutionReader {
               if (choice instanceof PrimSig && parent==((PrimSig)choice).parent && ((Sig)choice).label.equals(label))
                  { ans=(Sig)choice; choices.remove(choice); break; }
            if (ans==null) {
-              ans = new PrimSig(label, (PrimSig)parent, isAbstract, isLone, isOne, isSome, isPrivate, isMeta, isEnum);
+              ans = isAtom ? new AtomSig(label, (PrimSig)parent)
+                           : new PrimSig(label, (PrimSig)parent, isAbstract, isLone, isOne, isSome, isPrivate, isMeta, isEnum);
               allsigs.add(ans);
            }
         } else {
@@ -248,28 +264,36 @@ public final class A4SolutionReader {
        for(XMLNode sub: xml) if (sub.is("instance")) { inst=sub; break; }
        if (inst==null) throw new ErrorSyntax("The XML file must contain an <instance> element.");
        // set up the basic values of the A4Solution object
-       final int bitwidth = Integer.parseInt(inst.getAttribute("bitwidth"));
        final int maxseq = Integer.parseInt(inst.getAttribute("maxseq"));
-       final int max = Util.max(bitwidth), min = Util.min(bitwidth);
-       if (bitwidth>=1 && bitwidth<=30) for(int i=min; i<=max; i++) { atoms.add(Integer.toString(i)); }
+       final boolean noOverflow = Boolean.parseBoolean(inst.getAttribute("noOverflow", "false"));
+       IntScope intScope = null;
        for(XMLNode x:inst) {
-           String id=x.getAttribute("ID");
-           if (id.length()>0 && (x.is("field") || x.is("skolem") || x.is("sig"))) {
-              if (nmap.put(id, x)!=null) throw new IOException("ID "+id+" is repeated.");
-              if (x.is("sig")) {
-                  boolean isString = STRING.label.equals(label(x)) && yes(x, "builtin");
-                  for(XMLNode y:x) if (y.is("atom")) {
-                      String attr = y.getAttribute("label");
-                      atoms.add(attr);
-                      if (isString) strings.add(attr);
+           if (x.is("intscope")) {
+               if (intScope != null) throw new ErrorFatal("More than one <intscope> node found.");
+               intScope = parseIntScope(x);
+           } else {
+               String id=x.getAttribute("ID");
+               if (id.length()>0 && (x.is("field") || x.is("skolem") || x.is("sig"))) {
+                  if (nmap.put(id, x)!=null) throw new IOException("ID "+id+" is repeated.");
+                  if (x.is("sig")) {
+                      boolean isString = STRING.label.equals(label(x)) && yes(x, "builtin");
+                      for(XMLNode y:x) if (y.is("atom")) {
+                          String attr = y.getAttribute("label");
+                          atoms.add(attr);
+                          if (isString) strings.add(attr);
+                      }
                   }
-              }
+               }
            }
        }
+       if (intScope == null) throw new ErrorFatal("No <intscope> node found.");
+       // add int atoms
+       for(int i : intScope.enumerate()) { atoms.add(Integer.toString(i)); }
        // create the A4Solution object
        A4Options opt = new A4Options();
        opt.originalFilename = inst.getAttribute("filename");
-       sol = new A4Solution(inst.getAttribute("command"), bitwidth, maxseq, strings, atoms, null, opt, 1);
+       opt.noOverflow = noOverflow;
+       sol = new A4Solution(inst.getAttribute("command"), intScope, maxseq, strings, atoms, null, opt, 1);
        factory = sol.getFactory();
        // parse all the sigs, fields, and skolems
        for(Map.Entry<String,XMLNode> e:nmap.entrySet()) if (e.getValue().is("sig")) parseSig(e.getKey(), 0);
@@ -278,19 +302,19 @@ public final class A4SolutionReader {
        for(Sig s:allsigs) if (!s.builtin) {
           TupleSet ts = expr2ts.remove(s);
           if (ts==null) ts = factory.noneOf(1); // If the sig was NOT mentioned in the XML file...
-          Relation r = sol.addRel(s.label, ts, ts);
+          Relation r = sol.addRel(s.label, ts, ts, s.isAtom != null);
           sol.addSig(s, r);
           for(Field f: s.getFields()) {
               ts = expr2ts.remove(f);
               if (ts==null) ts=factory.noneOf(f.type().arity()); // If the field was NOT mentioned in the XML file...
-              r = sol.addRel(s.label+"."+f.label, ts, ts);
+              r = sol.addRel(s.label+"."+f.label, ts, ts, false);
               sol.addField(f, r);
           }
        }
        for(Map.Entry<Expr,TupleSet> e:expr2ts.entrySet()) {
           ExprVar v = (ExprVar)(e.getKey());
           TupleSet ts = e.getValue();
-          Relation r = sol.addRel(v.label, ts, ts);
+          Relation r = sol.addRel(v.label, ts, ts, false);
           sol.kr2type(r, v.type());
        }
        // Done!

@@ -17,9 +17,9 @@ package edu.mit.csail.sdg.alloy4;
 
 import java.io.Serializable;
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.RandomAccess;
 
 /** Immutable; implements a list based on equals(); null values are allowed.

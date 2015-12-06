@@ -15,11 +15,14 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import static edu.mit.csail.sdg.alloy4.OurConsole.style;
+
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultEditorKit;
@@ -29,7 +32,6 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.TabSet;
 import javax.swing.text.TabStop;
-import static edu.mit.csail.sdg.alloy4.OurConsole.style;
 
 /** Graphical syntax-highlighting StyledDocument.
  *
@@ -89,8 +91,8 @@ class OurSyntaxDocument extends DefaultStyledDocument {
    /** This stores the currently recognized set of reserved keywords. */
    private static final String[] keywords = new String[] {"abstract", "all", "and", "as", "assert", "but", "check", "disj",
       "disjoint", "else", "enum", "exactly", "exh", "exhaustive", "expect", "extends", "fact", "for", "fun", "iden",
-      "iff", "implies", "in", "Int", "int", "let", "lone", "module", "no", "none", "not", "one", "open", "or", "part",
-      "partition", "pred", "private", "run", "seq", "set", "sig", "some", "String", "sum", "this", "univ"
+      "iff", "implies", "in", "Int", "int", "bit", "let", "lone", "module", "no", "none", "not", "one", "open", "or", "part",
+      "partition", "pred", "private", "run", "seq", "set", "sig", "some", "String", "sum", "this", "univ", "atomsig", "fix", "until", "while", "when"
    };
 
    /** Returns true if array[start .. start+len-1] matches one of the reserved keyword. */

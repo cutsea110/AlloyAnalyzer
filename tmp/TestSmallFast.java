@@ -1,13 +1,22 @@
 package tmp;
 import java.util.Arrays;
 import java.util.List;
-import kodkod.ast.*;
-import kodkod.ast.operator.*;
-import kodkod.instance.*;
-import kodkod.util.nodes.PrettyPrinter;
-import kodkod.engine.*;
-import kodkod.engine.satlab.SATFactory;
+
+import kodkod.ast.Decls;
+import kodkod.ast.Expression;
+import kodkod.ast.Formula;
+import kodkod.ast.Relation;
+import kodkod.ast.Variable;
+import kodkod.ast.operator.FormulaOperator;
+import kodkod.engine.Solution;
+import kodkod.engine.Solver;
 import kodkod.engine.config.Options;
+import kodkod.engine.satlab.SATFactory;
+import kodkod.instance.Bounds;
+import kodkod.instance.TupleFactory;
+import kodkod.instance.TupleSet;
+import kodkod.instance.Universe;
+import kodkod.util.nodes.PrettyPrinter;
 
 public final class TestSmallFast {
 
@@ -317,9 +326,9 @@ public final class TestSmallFast {
         solver.options().setIntEncoding(Options.IntEncoding.TWOSCOMPLEMENT);
         solver.options().setSymmetryBreaking(20);
         solver.options().setSkolemDepth(0);
-        
+
         System.out.println(PrettyPrinter.print(x9, 0));
-        
+
         System.out.println("Solving...");
         System.out.flush();
         Solution sol = solver.solve(x9, bounds);

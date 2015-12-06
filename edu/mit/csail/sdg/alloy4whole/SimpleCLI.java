@@ -22,6 +22,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
+
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
 import edu.mit.csail.sdg.alloy4.Pair;
@@ -33,15 +34,15 @@ import edu.mit.csail.sdg.alloy4compiler.ast.Decl;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprHasName;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Module;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompUtil;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
+import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4SolutionReader;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4SolutionWriter;
 import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
-import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
 import edu.mit.csail.sdg.alloy4viz.StaticInstanceReader;
 
 /** This class is used by the Alloy developers to drive the regression test suite.

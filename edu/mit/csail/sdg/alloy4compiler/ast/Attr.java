@@ -58,7 +58,10 @@ public final class Attr {
       BUILTIN("builtin"),
 
       /** ENUM; if a PrimSig has the ENUM attribute, it is toplevel and abstract and has only singleton children. */
-      ENUM("enum");
+      ENUM("enum"),
+
+      /** ATOM; if a PrimSig has the ATOM attribute, it is to be used when computing the scope for its super sig. */
+      ATOM("atom");
 
       /** The label for this attribute type. */
       private final String label;

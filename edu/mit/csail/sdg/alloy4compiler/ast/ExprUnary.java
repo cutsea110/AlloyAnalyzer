@@ -25,6 +25,7 @@ import java.util.List;
 
 import edu.mit.csail.sdg.alloy4.DirectedGraph;
 import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
@@ -46,6 +47,8 @@ public final class ExprUnary extends Expr {
 
     /** The subexpression. */
     public final Expr sub;
+
+    public final CommandScope scope;
 
     /** Caches the span() result. */
     private Pos span=null;
@@ -86,10 +89,11 @@ public final class ExprUnary extends Expr {
     //============================================================================================================//
 
     /** Constructs an unary expression. */
-    private ExprUnary(Pos pos, Op op, Expr sub, Type type, long weight, JoinableList<Err> errors) {
+    private ExprUnary(Pos pos, Op op, Expr sub, Type type, long weight, CommandScope scope, JoinableList<Err> errors) {
         super(pos, null, sub.ambiguous, type, (op==Op.EXACTLYOF||op==Op.SOMEOF||op==Op.LONEOF||op==Op.ONEOF||op==Op.SETOF)?1:0, weight, errors);
         this.op = op;
         this.sub = sub;
+        this.scope = scope;
     }
 
     //============================================================================================================//
@@ -122,8 +126,11 @@ public final class ExprUnary extends Expr {
         /** reflexive closure                                            */  RCLOSURE("*"),
         /** closure                                                      */  CLOSURE("^"),
         /** cardinality of x (truncated to the current integer bitwidth) */  CARDINALITY("#"),
+        /** bitwise negation */                                              BVNOT("bvnot"),
+        /** integer negation */                                              BVNEG("bvneg"),
         /** IntAtom-to-integer                                           */  CAST2INT("Int->int"),
         /** integer-to-IntAtom                                           */  CAST2SIGINT("int->Int"),
+        /** Post-state                                                   */  PRE("PRE"),
         /** No-Operation                                                 */  NOOP("NOOP");
 
         /** The constructor */
@@ -141,7 +148,9 @@ public final class ExprUnary extends Expr {
          * <br> Alloy4 does allow "variable : set (X lone-> Y)", where we ignore the word "set".
          * <br> (This desugaring is done by the ExprUnary.Op.make() method, so ExprUnary's constructor never sees it)
          */
-        public final Expr make(Pos pos, Expr sub) { return make(pos, sub, null, 0); }
+        public final Expr make(Pos pos, Expr sub) { return make(pos, sub, null, 0, null); }
+        public final Expr make(Pos pos, Expr sub, CommandScope scope) { return make(pos, sub, null, 0, scope); }
+        public final Expr make(Pos pos, Expr sub, Err extraError, long extraWeight) { return make(pos, sub, extraError, extraWeight, null); }
 
         /** Construct an ExprUnary node.
          * @param pos - the original position of the "unary operator" in the file (can be null if unknown)
@@ -154,7 +163,7 @@ public final class ExprUnary extends Expr {
          * <br> Alloy4 does allow "variable : set (X lone-> Y)", where we ignore the word "set".
          * <br> (This desugaring is done by the ExprUnary.Op.make() method, so ExprUnary's constructor never sees it)
          */
-        public final Expr make(Pos pos, Expr sub, Err extraError, long extraWeight) {
+        public final Expr make(Pos pos, Expr sub, Err extraError, long extraWeight, CommandScope scope) {
             if (pos==null || pos==Pos.UNKNOWN) { if (this==NOOP) pos = sub.pos; else pos = sub.span(); }
             JoinableList<Err> errors = sub.errors.make(extraError);
             if (sub.mult!=0) {
@@ -170,13 +179,13 @@ public final class ExprUnary extends Expr {
             switch(this) {
                case NOOP: break;
                case NOT: sub=sub.typecheck_as_formula(); break;
-               case CAST2SIGINT: 
+               case CAST2SIGINT:
                    if (sub instanceof ExprUnary)
                        if (((ExprUnary) sub).op == CAST2SIGINT)
                            return sub;
-                   sub=sub.typecheck_as_int(); 
+                   sub=sub.typecheck_as_int();
                    break;
-               case CAST2INT: 
+               case CAST2INT:
                    if (sub instanceof ExprUnary) {
                        // shortcircuit
                        ExprUnary sub2 = (ExprUnary) sub;
@@ -185,7 +194,7 @@ public final class ExprUnary extends Expr {
                        if (sub2.op == CAST2SIGINT)
                            return sub2.sub;
                    }
-                   sub=sub.typecheck_as_set(); 
+                   sub=sub.typecheck_as_set();
                    break;
                default: sub=sub.typecheck_as_set();
             }
@@ -221,8 +230,17 @@ public final class ExprUnary extends Expr {
               case CAST2SIGINT:
                 type=SIGINT.type;
                 break;
+            case BVNOT: case BVNEG:
+                type=SIGINT.type;
+                break;
+            case NOOP:
+                break;
+            case PRE:
+                break;
+            default:
+                throw new RuntimeException("'make' not implemented for case: " + this);
             }
-            return new ExprUnary(pos, this, sub, type, extraWeight + sub.weight, errors.make(extraError));
+            return new ExprUnary(pos, this, sub, type, extraWeight + sub.weight, scope, errors.make(extraError));
         }
 
         /** Returns the human readable label for this operator */

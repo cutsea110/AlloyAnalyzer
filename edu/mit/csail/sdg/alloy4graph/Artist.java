@@ -17,6 +17,7 @@ package edu.mit.csail.sdg.alloy4graph;
 
 import static java.awt.BasicStroke.CAP_ROUND;
 import static java.awt.BasicStroke.JOIN_ROUND;
+
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -28,6 +29,7 @@ import java.awt.font.GlyphVector;
 import java.awt.geom.CubicCurve2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+
 import edu.mit.csail.sdg.alloy4.OurPDFWriter;
 
 /** This class abstracts the drawing operations so that we can

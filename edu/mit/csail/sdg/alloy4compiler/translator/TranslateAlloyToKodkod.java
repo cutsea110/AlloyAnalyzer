@@ -37,6 +37,7 @@ import kodkod.ast.QuantifiedFormula;
 import kodkod.ast.Relation;
 import kodkod.ast.Variable;
 import kodkod.ast.operator.ExprOperator;
+import kodkod.ast.operator.Quantifier;
 import kodkod.engine.CapacityExceededException;
 import kodkod.engine.fol2sat.HigherOrderDeclException;
 import kodkod.instance.Tuple;
@@ -51,9 +52,9 @@ import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
-import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Decl;
@@ -61,6 +62,7 @@ import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprBinary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprCall;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprFix;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprHasName;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprITE;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
@@ -69,6 +71,7 @@ import edu.mit.csail.sdg.alloy4compiler.ast.ExprQt;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Type;
@@ -78,8 +81,8 @@ import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 
 public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
 
-    static int cnt = 0; 
-    
+    static int cnt = 0;
+
     /** This is used to detect "function recursion" (which we currently do not allow);
      * also, by knowing the current function name, we can provide a more meaningful name for skolem variables
      */
@@ -98,22 +101,18 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     private final ConstMap<String,Expression> s2k;
 
     /** The current reporter. */
-    private A4Reporter rep;
+    private IA4Reporter rep;
 
     /** If nonnull, it's the current command. */
     private final Command cmd;
 
-    /** The bitwidth. */
-    private final int bitwidth;
-
-    /** The minimum allowed integer. */
-    private final int min;
-
-    /** The maximum allowed integer. */
-    private final int max;
-
+    /** Scope for integers */
+    private final IntScope intScope; 
+    
     /** The maximum allowed loop unrolling and recursion. */
     private final int unrolls;
+    private final A4Options opt;
+    private final Iterable<Sig> sigs;
 
     /** Construct a translator based on the given list of sigs and the given command.
      * @param rep - if nonnull, it's the reporter that will receive diagnostics and progress reports
@@ -121,35 +120,36 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
      * @param sigs - the list of sigs (must not be null, and must be a complete list)
      * @param cmd - the command to solve (must not be null)
      */
-    private TranslateAlloyToKodkod (A4Reporter rep, A4Options opt, Iterable<Sig> sigs, Command cmd) throws Err {
+    private TranslateAlloyToKodkod (IA4Reporter rep, A4Options opt, Iterable<Sig> sigs, Command cmd) throws Err {
+        this.opt = opt;
+        this.sigs = sigs;
         this.unrolls = opt.unrolls;
         this.rep = (rep != null) ? rep : A4Reporter.NOP;
-        this.cmd = cmd;
         Pair<A4Solution, ScopeComputer> pair = ScopeComputer.compute(this.rep, opt, sigs, cmd);
         this.frame = pair.a;
-        this.bitwidth = pair.a.getBitwidth();
-        this.min = pair.a.min();
-        this.max = pair.a.max();
+        this.intScope = pair.a.intScope(); 
+        this.cmd = pair.b.cmd;
         this.a2k = null;
-        this.s2k = null;
+        this.s2k = null;        
         BoundsComputer.compute(rep, frame, pair.b, sigs);
+        
+        this.makeFacts(cmd.formula);
     }
 
     /** Construct a translator based on a already-fully-constructed association map.
-     * @param bitwidth - the integer bitwidth to use
+     * @param intScope - integer scope
      * @param unrolls - the maximum number of loop unrolling and recursion allowed
      * @param a2k - the mapping from Alloy sig/field/skolem/atom to the corresponding Kodkod expression
      */
-    private TranslateAlloyToKodkod (int bitwidth, int unrolls, Map<Expr,Expression> a2k, Map<String,Expression> s2k) throws Err {
+    private TranslateAlloyToKodkod (IntScope intScope, int unrolls, Map<Expr,Expression> a2k, Map<String,Expression> s2k) throws Err {
+        this.opt = null;
+        this.sigs = null;
+
         this.unrolls = unrolls;
-        if (bitwidth<0)  throw new ErrorSyntax("Cannot specify a bitwidth less than 0");
-        if (bitwidth>30) throw new ErrorSyntax("Cannot specify a bitwidth greater than 30");
         this.rep = A4Reporter.NOP;
         this.cmd = null;
         this.frame = null;
-        this.bitwidth = bitwidth;
-        this.max = Util.max(bitwidth);
-        this.min = Util.min(bitwidth);
+        this.intScope = intScope;
         this.a2k = ConstMap.make(a2k);
         this.s2k = ConstMap.make(s2k);
     }
@@ -246,7 +246,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
             }
             return ans;
         }
-        @Override public boolean simplify(A4Reporter rep, A4Solution sol, List<Formula> unused) throws Err {
+        @Override public boolean simplify(IA4Reporter rep, A4Solution sol, List<Formula> unused) throws Err {
             TupleFactory factory = sol.getFactory();
             TupleSet oldUniv = convert(factory, Sig.UNIV);
             Set<Object> oldAtoms = new HashSet<Object>(); for(Tuple t: oldUniv) oldAtoms.add(t.atom(0));
@@ -308,7 +308,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
           + "Visit http://alloy.mit.edu/ for advice on refactoring.");
     }
 
-    private static A4Solution execute_greedyCommand(A4Reporter rep, Iterable<Sig> sigs, Command usercommand, A4Options opt) throws Exception {
+    private static A4Solution execute_greedyCommand(IA4Reporter rep, Iterable<Sig> sigs, Command usercommand, A4Options opt) throws Exception {
         // FIXTHIS: if the next command has a "smaller scope" than the last command, we would get a Kodkod exception...
         // FIXTHIS: if the solver is "toCNF" or "toKodkod" then this method will throw an Exception...
         // FIXTHIS: does solution enumeration still work when we're doing a greedy solve?
@@ -335,8 +335,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
                 while(cmd != null) {
                     rep.debug(cmd.scope.toString());
                     usercommand = cmd;
-                    tr = new TranslateAlloyToKodkod(rep2, opt, sigs, cmd);
-                    tr.makeFacts(cmd.formula);
+                    tr = translate(rep2, sigs, cmd, opt); 
                     sim.totalOrderPredicates = tr.totalOrderPredicates;
                     sol = tr.frame.solve(rep2, cmd, sim.partial==null || cmd.check ? new Simplifier() : sim, false);
                     if (!sol.satisfiable() && !cmd.check) {
@@ -351,8 +350,8 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
                     if (sim.growableSigs.isEmpty()) break;
                     for(Sig s: sim.growableSigs) {
                         CommandScope sc = cmd.getScope(s);
-                        if (sc.increment > sc.endingScope - sc.startingScope) {cmd=null; break;}
-                        cmd = cmd.change(s, sc.isExact, sc.startingScope+sc.increment, sc.endingScope, sc.increment);
+                        if (sc.increment() > sc.endingScope() - sc.startingScope()) {cmd=null; break;}
+                        cmd = cmd.change(s, sc.isExact(), sc.startingScope()+sc.increment(), sc.endingScope(), sc.increment());
                     }
                 }
             }
@@ -378,24 +377,8 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
      * <p> If the return value X is satisfiable, you can call X.next() to get the next satisfying solution X2;
      * and you can call X2.next() to get the next satisfying solution X3... until you get an unsatisfying solution.
      */
-    public static A4Solution execute_command (A4Reporter rep, Iterable<Sig> sigs, Command cmd, A4Options opt) throws Err {
-        if (rep==null) rep = A4Reporter.NOP;
-        TranslateAlloyToKodkod tr = null;
-        try {
-            if (cmd.parent!=null || !cmd.getGrowableSigs().isEmpty()) return execute_greedyCommand(rep, sigs, cmd, opt);
-            tr = new TranslateAlloyToKodkod(rep, opt, sigs, cmd);
-            tr.makeFacts(cmd.formula);
-            return tr.frame.solve(rep, cmd, new Simplifier(), false);
-        } catch(UnsatisfiedLinkError ex) {
-            throw new ErrorFatal("The required JNI library cannot be found: "+ex.toString().trim(), ex);
-        } catch(CapacityExceededException ex) {
-            throw rethrow(ex);
-        } catch(HigherOrderDeclException ex) {
-            Pos p = tr!=null ? tr.frame.kv2typepos(ex.decl().variable()).b : Pos.UNKNOWN;
-            throw new ErrorType(p, "Analysis cannot be performed since it requires higher-order quantification that could not be skolemized.");
-        } catch(Throwable ex) {
-            if (ex instanceof Err) throw (Err)ex; else throw new ErrorFatal("Unknown exception occurred: "+ex, ex);
-        }
+    public static A4Solution execute_command (IA4Reporter rep, Iterable<Sig> sigs, Command cmd, A4Options opt) throws Err {
+        return translate(rep, sigs, cmd, opt).executeCommand();
     }
 
     /** Based on the specified "options", execute one command and return the resulting A4Solution object.
@@ -413,14 +396,16 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
      * <p> If the return value X is satisfiable, you can call X.next() to get the next satisfying solution X2;
      * and you can call X2.next() to get the next satisfying solution X3... until you get an unsatisfying solution.
      */
-    public static A4Solution execute_commandFromBook (A4Reporter rep, Iterable<Sig> sigs, Command cmd, A4Options opt) throws Err {
+    public static A4Solution execute_commandFromBook (IA4Reporter rep, Iterable<Sig> sigs, Command cmd, A4Options opt) throws Err {
+        return translate(rep, sigs, cmd, opt).executeCommandFromBook();
+    }
+
+    public static TranslateAlloyToKodkod translate(IA4Reporter rep, Iterable<Sig> sigs, Command cmd, A4Options opt) throws Err {
         if (rep==null) rep = A4Reporter.NOP;
         TranslateAlloyToKodkod tr = null;
         try {
-            if (cmd.parent!=null || !cmd.getGrowableSigs().isEmpty()) return execute_greedyCommand(rep, sigs, cmd, opt);
             tr = new TranslateAlloyToKodkod(rep, opt, sigs, cmd);
-            tr.makeFacts(cmd.formula);
-            return tr.frame.solve(rep, cmd, new Simplifier(), true);
+            return tr;
         } catch(UnsatisfiedLinkError ex) {
             throw new ErrorFatal("The required JNI library cannot be found: "+ex.toString().trim(), ex);
         } catch(CapacityExceededException ex) {
@@ -440,7 +425,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     public static Object alloy2kodkod(A4Solution sol, Expr expr) throws Err {
         if (expr.ambiguous && !expr.errors.isEmpty()) expr = expr.resolve(expr.type(), null);
         if (!expr.errors.isEmpty()) throw expr.errors.pick();
-        TranslateAlloyToKodkod tr = new TranslateAlloyToKodkod(sol.getBitwidth(), sol.unrolls(), sol.a2k(), sol.s2k());
+        TranslateAlloyToKodkod tr = new TranslateAlloyToKodkod(sol.intScope(), sol.unrolls(), sol.a2k(), sol.s2k());
         Object ans;
         try {
             ans = tr.visitThis(expr);
@@ -490,7 +475,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
         // simplify: if y is Int[sth], then return sth
         if (y instanceof IntToExprCast)
             return ((IntToExprCast) y).intExpr();
-        if (y instanceof IntExpression) 
+        if (y instanceof IntExpression)
             return (IntExpression)y;
         //[AM]: maybe this conversion should be removed
         if (y instanceof Expression) return ((Expression) y).sum();
@@ -576,8 +561,8 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     /** {@inheritDoc} */
     @Override public Object visit(ExprConstant x) throws Err {
         switch(x.op) {
-          case MIN: return IntConstant.constant(min); //TODO
-          case MAX: return IntConstant.constant(max); //TODO
+          case MIN: return IntConstant.constant(intScope.minInt()); //TODO
+          case MAX: return IntConstant.constant(intScope.maxInt()); //TODO
           case NEXT: return A4Solution.KK_NEXT;
           case TRUE: return Formula.TRUE;
           case FALSE: return Formula.FALSE;
@@ -619,6 +604,9 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
                 Expression iden=Expression.IDEN.intersection(a2k(UNIV).product(Relation.UNIV));
                 return cset(x.sub).closure().union(iden);
             case CLOSURE: return cset(x.sub).closure();
+            case PRE: return cset(x.sub).pre();
+            case BVNOT: return cint(x.sub).not();
+            case BVNEG: return cint(x.sub).negate();
         }
         throw new ErrorFatal(x.pos, "Unsupported operator ("+x.op+") encountered during ExprUnary.visit()");
     }
@@ -647,7 +635,8 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     /** {@inheritDoc} */
     @Override public Object visit(Field x) throws Err {
         Expression ans = a2k(x);
-        if (ans==null) throw new ErrorFatal(x.pos, "Field \""+x+"\" is not bound to a legal value during translation.\n");
+        if (ans==null) 
+            throw new ErrorFatal(x.pos, "Field \""+x+"\" is not bound to a legal value during translation.\n");
         return ans;
     }
 
@@ -658,7 +647,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     /** {@inheritDoc} */
     @Override public Object visit(Sig x) throws Err {
         Expression ans = a2k(x);
-        if (ans==null) 
+        if (ans==null)
             throw new ErrorFatal(x.pos, "Sig \""+x+"\" is not bound to a legal value during translation.\n");
         return ans;
     }
@@ -735,7 +724,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
         if (x.op == ExprList.Op.TOTALORDER) {
             Expression elem = cset(x.args.get(0)), first = cset(x.args.get(1)), next = cset(x.args.get(2));
             if (elem instanceof Relation && first instanceof Relation && next instanceof Relation) {
-                Relation lst = frame.addRel("", null, frame.query(true, (Relation)elem, false));
+                Relation lst = frame.addRel("", null, frame.query(true, (Relation)elem, false), false);
                 totalOrderPredicates.add((Relation)elem); totalOrderPredicates.add((Relation)first); totalOrderPredicates.add(lst); totalOrderPredicates.add((Relation)next);
                 return k2pos(((Relation)next).totalOrder((Relation)elem, (Relation)first, lst), x);
             }
@@ -799,18 +788,25 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
             case IPLUS:
                 return cint(a).plus(cint(b));
             case MINUS:
+                //[AM]: not safe to do this anymore when we can have sparse integers
                 // Special exception to allow "0-8" to not throw an exception, where 7 is the maximum allowed integer (when bitwidth==4)
                 // (likewise, when bitwidth==5, then +15 is the maximum allowed integer, and we want to allow 0-16 without throwing an exception)
-                if (a instanceof ExprConstant && ((ExprConstant)a).op==ExprConstant.Op.NUMBER && ((ExprConstant)a).num()==0)
-                   if (b instanceof ExprConstant && ((ExprConstant)b).op==ExprConstant.Op.NUMBER && ((ExprConstant)b).num()==max+1)
-                      return IntConstant.constant(min);
+//                if (a instanceof ExprConstant && ((ExprConstant)a).op==ExprConstant.Op.NUMBER && ((ExprConstant)a).num()==0)
+//                   if (b instanceof ExprConstant && ((ExprConstant)b).op==ExprConstant.Op.NUMBER && ((ExprConstant)b).num()==max+1)
+//                      return IntConstant.constant(min);
                 return cset(a).difference(cset(b));
                 //[AM]
 //                obj=visitThis(a);
 //                if (obj instanceof IntExpression) { i=(IntExpression)obj; return i.minus(cint(b));}
 //                s=(Expression)obj; return s.difference(cset(b));
-            case IMINUS: 
-                return cint(a).minus(cint(b));
+            case IMINUS: return cint(a).minus(cint(b));
+            case BVAND:  return cint(a).and(cint(b));
+            case BVOR:   return cint(a).or(cint(b));
+            case BVEQ:   return cint(a).eq(cint(b));
+            case BVXOR:  return cint(a).xor(cint(b));
+            case BVSHL:  return cint(a).shl(cint(b));
+            case BVSHR:  return cint(a).shr(cint(b));
+            case BVSHA:  return cint(a).sha(cint(b));
             case INTERSECT:
                 s=cset(a); return s.intersection(cset(b));
             case ANY_ARROW_SOME: case ANY_ARROW_ONE: case ANY_ARROW_LONE:
@@ -833,7 +829,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
                 eL = toSet(a, objL);
 		        eR = toSet(b, objR);
                 if (eL instanceof IntToExprCast && eR instanceof IntToExprCast)
-                    f = ((IntToExprCast) eL).intExpr().eq(((IntToExprCast) eR).intExpr()); 
+                    f = ((IntToExprCast) eL).intExpr().eq(((IntToExprCast) eR).intExpr());
                 else
                     f = eL.eq(eR);
                 return k2pos(f, x);
@@ -843,7 +839,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
                 eL = toSet(a, objL);
                 eR = toSet(b, objR);
                 if (eL instanceof IntToExprCast && eR instanceof IntToExprCast)
-                    f = ((IntToExprCast) eL).intExpr().eq(((IntToExprCast) eR).intExpr()).not(); 
+                    f = ((IntToExprCast) eL).intExpr().eq(((IntToExprCast) eR).intExpr()).not();
                 else
                     f = eL.eq(eR).not();
                 return k2pos(f, x);
@@ -876,7 +872,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
           default:        b=cset(right); return a.in(b);
        }
     }
-    
+
     //[AM]
     private static boolean am = true;
 
@@ -903,6 +899,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
            case ANY_ARROW_LONE: case SOME_ARROW_LONE: case ONE_ARROW_LONE: case LONE_ARROW_LONE: ans1=ar.lone().and(ans1); break;
            case ANY_ARROW_ONE:  case SOME_ARROW_ONE:  case ONE_ARROW_ONE:  case LONE_ARROW_ONE:  ans1=ar.one().and(ans1);  break;
            case ANY_ARROW_SOME: case SOME_ARROW_SOME: case ONE_ARROW_SOME: case LONE_ARROW_SOME: ans1=ar.some().and(ans1); break;
+           default: break;
         }
         if (a.arity()>1) { Formula tmp=isIn(atuple, ab.left); if (tmp!=Formula.TRUE) ans1=tmp.implies(ans1); }
         ans1=ans1.forAll(d);
@@ -923,6 +920,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
            case LONE_ARROW_ANY: case LONE_ARROW_SOME: case LONE_ARROW_ONE: case LONE_ARROW_LONE: ans2=rb.lone().and(ans2); break;
            case ONE_ARROW_ANY:  case ONE_ARROW_SOME:  case ONE_ARROW_ONE:  case ONE_ARROW_LONE:  ans2=rb.one().and(ans2);  break;
            case SOME_ARROW_ANY: case SOME_ARROW_SOME: case SOME_ARROW_ONE: case SOME_ARROW_LONE: ans2=rb.some().and(ans2); break;
+           default: break;
         }
         if (b.arity()>1) { Formula tmp=isIn(btuple, ab.right); if (tmp!=Formula.TRUE) ans2=tmp.implies(ans2); }
         ans2=ans2.forAll(d2);
@@ -939,7 +937,7 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     private Decls am(final Expression a, Decls d, int i, Variable v) {
         Expression colType;
         if (a.arity() == 1) {
-            assert i == 1; 
+            assert i == 1;
             colType = a;
         } else {
             // colType = a.project(IntConstant.constant(i - 1))); //UNSOUND
@@ -967,9 +965,9 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
     }
 
    /** Helper method that translates the quantification expression "op vars | sub" */
-   private Object visit_qt(final ExprQt.Op op, final ConstList<Decl> xvars, final Expr sub) throws Err {
+   private Object visit_qt(final ExprQt.Op op, final ConstList<Decl> xvars, final Expr dom, final Expr sub) throws Err {
       if (op == ExprQt.Op.NO) {
-         return visit_qt(ExprQt.Op.ALL, xvars, sub.not());
+         return visit_qt(ExprQt.Op.ALL, xvars, dom, sub.not());
       }
       if (op == ExprQt.Op.ONE || op == ExprQt.Op.LONE) {
          boolean ok = true;
@@ -977,17 +975,17 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
             Expr v = addOne(xvars.get(i).expr).deNOP();
             if (v.type().arity()!=1 || v.mult()!=ExprUnary.Op.ONEOF) { ok=false; break; }
          }
-         if (op==ExprQt.Op.ONE && ok) return ((Expression) visit_qt(ExprQt.Op.COMPREHENSION, xvars, sub)).one();
-         if (op==ExprQt.Op.LONE && ok) return ((Expression) visit_qt(ExprQt.Op.COMPREHENSION, xvars, sub)).lone();
+         if (op==ExprQt.Op.ONE && ok) return ((Expression) visit_qt(ExprQt.Op.COMPREHENSION, xvars, dom, sub)).one();
+         if (op==ExprQt.Op.LONE && ok) return ((Expression) visit_qt(ExprQt.Op.COMPREHENSION, xvars, dom, sub)).lone();
       }
       if (op == ExprQt.Op.ONE) {
-         Formula f1 = (Formula) visit_qt(ExprQt.Op.LONE, xvars, sub);
-         Formula f2 = (Formula) visit_qt(ExprQt.Op.SOME, xvars, sub);
+         Formula f1 = (Formula) visit_qt(ExprQt.Op.LONE, xvars, dom, sub);
+         Formula f2 = (Formula) visit_qt(ExprQt.Op.SOME, xvars, dom, sub);
          return f1.and(f2);
       }
       if (op == ExprQt.Op.LONE) {
-         QuantifiedFormula p1 = (QuantifiedFormula) visit_qt(ExprQt.Op.ALL, xvars, sub);
-         QuantifiedFormula p2 = (QuantifiedFormula) visit_qt(ExprQt.Op.ALL, xvars, sub);
+         QuantifiedFormula p1 = (QuantifiedFormula) visit_qt(ExprQt.Op.ALL, xvars, dom, sub);
+         QuantifiedFormula p2 = (QuantifiedFormula) visit_qt(ExprQt.Op.ALL, xvars, dom, sub);
          Decls s1 = p1.decls(), s2 = p2.decls(), decls = null;
          Formula f1 = p1.formula(), f2 = p2.formula();
          Formula[] conjuncts = new Formula[s1.size()];
@@ -1021,26 +1019,68 @@ public final class TranslateAlloyToKodkod extends VisitReturn<Object> {
         }
       }
       final Formula ans = (op==ExprQt.Op.SUM) ? null : cform(sub) ;
+      final Formula kkDom = cform(dom);
       final IntExpression ians = (op!=ExprQt.Op.SUM) ? null : cint(sub) ;
       for(Decl d: xvars) for(ExprHasName v: d.names) env.remove((ExprVar)v);
+      //TODO: what about COMPREHENSION and SUM?
       if (op==ExprQt.Op.COMPREHENSION) return ans.comprehension(dd); // guards.size()==0, since each var has to be unary
       if (op==ExprQt.Op.SUM) return ians.sum(dd);                    // guards.size()==0, since each var has to be unary
-      if (op==ExprQt.Op.SOME) {
-         if (guards.size()==0) return ans.forSome(dd);
-         guards.add(ans);
-         return Formula.and(guards).forSome(dd);
-      } else {
-         if (guards.size()==0) return ans.forAll(dd);
-         return Formula.and(guards).implies(ans).forAll(dd);
-      }
+
+      //TODO: maybe add guards to kkDom instead
+      boolean isSome = op==ExprQt.Op.SOME;
+      Quantifier quantOp = isSome ? Quantifier.SOME : Quantifier.ALL;
+      if (guards.size()==0) return ans.quantify(quantOp, dd, kkDom);
+      Formula grds = Formula.and(guards);
+      Formula qBody = isSome ? grds.and(ans) : grds.implies(ans);
+      // add quards to domain constraint as well (only relevant for higher-order solving)
+      Formula qDom = opt.higherOrderSolver ? grds.and(kkDom) : kkDom;
+      return qBody.quantify(quantOp, dd, qDom);
+
+//      if (op==ExprQt.Op.SOME) {
+//         if (guards.size()==0) return ans.forSome(dd, kkDom);
+//         return Formula.and(guards).and(ans).forSome(dd, kkDom);
+//      } else {
+//         if (guards.size()==0) return ans.forAll(dd, kkDom);
+//         return Formula.and(guards).implies(ans).forAll(dd, kkDom);
+//      }
    }
 
     /** {@inheritDoc} */
     @Override public Object visit(ExprQt x) throws Err {
         Expr xx = x.desugar();
         if (xx instanceof ExprQt) x = (ExprQt)xx; else return visitThis(xx);
-        Object ans = visit_qt(x.op, x.decls, x.sub);
+        Object ans = visit_qt(x.op, x.decls, x.dom, x.sub);
         if (ans instanceof Formula) k2pos((Formula)ans, x);
         return ans;
+    }
+
+    @Override
+    public Object visit(ExprFix x) throws Err {
+        Formula f = cform(x.formula);
+        Formula ans = f.fix(cform(x.cond));
+        return k2pos(ans,x);
+    }
+
+    public A4Solution executeCommandFromBook() throws Err { return executeCommand(true); }
+    public A4Solution executeCommand() throws Err         { return executeCommand(false); }
+    public A4Solution executeCommand(boolean tryFromBook) throws Err {
+        try {
+            if (sigs != null && cmd.parent!=null || !cmd.getGrowableSigs().isEmpty())
+                return execute_greedyCommand(rep, sigs, cmd, opt);
+            return frame.solve(rep, cmd, new Simplifier(), tryFromBook);
+        } catch(UnsatisfiedLinkError ex) {
+            throw new ErrorFatal("The required JNI library cannot be found: "+ex.toString().trim(), ex);
+        } catch(CapacityExceededException ex) {
+            throw rethrow(ex);
+        } catch(HigherOrderDeclException ex) {
+            Pos p = frame.kv2typepos(ex.decl().variable()).b;
+            throw new ErrorType(p, "Analysis cannot be performed since it requires higher-order quantification that could not be skolemized.", ex);
+        } catch(Throwable ex) {
+            if (ex instanceof Err) throw (Err)ex; else throw new ErrorFatal("Unknown exception occurred: "+ex, ex);
+        }
+    }
+
+    public A4Solution getFrame() {
+        return frame;
     }
 }

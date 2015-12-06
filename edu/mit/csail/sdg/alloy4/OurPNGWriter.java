@@ -15,10 +15,11 @@
 
 package edu.mit.csail.sdg.alloy4;
 
-import java.io.IOException;
-import java.io.File;
-import java.io.RandomAccessFile;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+
 import javax.imageio.ImageIO;
 
 /** Graphical convenience methods for producing PNG files. */

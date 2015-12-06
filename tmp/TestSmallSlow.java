@@ -1,13 +1,24 @@
 package tmp;
 import java.util.Arrays;
 import java.util.List;
-import kodkod.ast.*;
-import kodkod.ast.operator.*;
-import kodkod.instance.*;
-import kodkod.util.nodes.PrettyPrinter;
-import kodkod.engine.*;
-import kodkod.engine.satlab.SATFactory;
+
+import kodkod.ast.Decls;
+import kodkod.ast.Expression;
+import kodkod.ast.Formula;
+import kodkod.ast.Relation;
+import kodkod.ast.Variable;
+import kodkod.ast.operator.FormulaOperator;
+import kodkod.engine.Evaluator;
+import kodkod.engine.Solution;
+import kodkod.engine.Solver;
 import kodkod.engine.config.Options;
+import kodkod.engine.satlab.SATFactory;
+import kodkod.instance.Bounds;
+import kodkod.instance.Instance;
+import kodkod.instance.TupleFactory;
+import kodkod.instance.TupleSet;
+import kodkod.instance.Universe;
+import kodkod.util.nodes.PrettyPrinter;
 
 public final class TestSmallSlow {
 
@@ -343,32 +354,32 @@ public final class TestSmallSlow {
         solver.options().setIntEncoding(Options.IntEncoding.TWOSCOMPLEMENT);
         solver.options().setSymmetryBreaking(20);
         solver.options().setSkolemDepth(0);
-        
+
         System.out.println(PrettyPrinter.print(x9, 0));
         System.out.println(bounds);
-        
+
         System.out.println("Solving...");
         System.out.flush();
         Solution sol = solver.solve(x9, bounds);
         System.out.println(sol.toString());
-        
+
         Instance inst = sol.instance();
         Evaluator ev = new Evaluator(inst);
-        
+
         System.out.println("Universe: " + ev.evaluate(Expression.UNIV));
         Formula xx = x46.forAll(x40).forAll(x11);
         System.out.println(PrettyPrinter.print(xx, 2));
         System.out.println(ev.evaluate(xx));
-        
+
         System.out.println(PrettyPrinter.print(x46, 4));
-        
+
 //        Variable r = Variable.unary("this");
 //        Variable u1 = Variable.unary("u1");
 //        Variable u2 = Variable.unary("u2");
-//        
+//
 //        Formula ff = u1.product(u2).in(x6.product(x6)).forAll(u1.oneOf(Expression.UNIV).and(u2.oneOf(Expression.UNIV))).forAll(r.oneOf(x7));
 //        System.out.println(PrettyPrinter.print(ff, 0));
 //        System.out.println(ev.evaluate(ff));
-        
+
     }
 }

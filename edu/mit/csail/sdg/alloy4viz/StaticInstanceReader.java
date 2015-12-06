@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
@@ -224,7 +225,8 @@ public final class StaticInstanceReader {
          sig2type.put(Sig.SEQIDX, AlloyType.SEQINT);
          sig2type.put(Sig.STRING, AlloyType.STRING);
          ts.put(AlloyType.SEQINT, AlloyType.INT);
-         for(int i=sol.min(), max=sol.max(), maxseq=sol.getMaxSeq(); i<=max; i++) {
+         int maxseq = sol.getMaxSeq();
+         for (int i : sol.intScope().enumerate()) {
             AlloyAtom at = new AlloyAtom(i>=0 && i<maxseq ? AlloyType.SEQINT : AlloyType.INT, i, ""+i);
             atom2sets.put(at, new LinkedHashSet<AlloySet>());
             string2atom.put(""+i, at);

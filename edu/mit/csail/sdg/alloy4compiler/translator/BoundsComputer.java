@@ -16,9 +16,15 @@
 package edu.mit.csail.sdg.alloy4compiler.translator;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import kodkod.ast.ConstantExpression;
 import kodkod.ast.Decls;
 import kodkod.ast.Expression;
 import kodkod.ast.Formula;
@@ -28,19 +34,27 @@ import kodkod.instance.Tuple;
 import kodkod.instance.TupleFactory;
 import kodkod.instance.TupleSet;
 import kodkod.instance.Universe;
-import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.ErrorFatal;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
+import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprBinary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntSubsetScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.Type;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.AtomSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.SubsetSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Type;
+import edu.mit.csail.sdg.alloy4compiler.translator.PartialInstance.Atom;
+import edu.mit.csail.sdg.alloy4compiler.translator.PartialInstance.Fix;
 
 /** Immutable; this class assigns each sig and field to some Kodkod relation or expression, then set the bounds. */
 
@@ -50,7 +64,7 @@ final class BoundsComputer {
     // getFactory(), query(), a2k(), addRel(), addSig(), addField(), addFormula()
 
     /** Stores the reporter that will receive diagnostic messages. */
-    private final A4Reporter rep;
+    private final IA4Reporter rep;
 
     /** Stores the scope, bounds, and other settings necessary for performing a solve. */
     private final A4Solution sol;
@@ -69,6 +83,23 @@ final class BoundsComputer {
 
     //==============================================================================================================//
 
+    private Tuple removeAtomByName(List<Tuple> atoms, Object atom) throws Err {
+       Tuple res = null;
+       int i = atoms.size() - 1;
+       for (; i >= 0; i--) {
+           Tuple t = atoms.get(i);
+           if (t.atom(0).equals(atom)) {
+               res = t;
+               break;
+           }
+       }
+       if (res == null) throw new ErrorFatal("Atom '" + atom + "' not found");
+       atoms.remove(i);
+       return res;
+    }
+
+    //==============================================================================================================//
+
     /** Computes the lowerbound from bottom-up; it will also set a suitable initial value for each sig's upperbound.
      * Precondition: sig is not a builtin sig
      */
@@ -77,9 +108,21 @@ final class BoundsComputer {
         TupleSet lower = factory.noneOf(1);
         for(PrimSig c:sig.children()) lower.addAll(computeLowerBound(atoms, c));
         TupleSet upper = lower.clone();
+        // [PI] add atoms from the partial instance
+        List<Atom> sigLower = sc.pi.sigLower(sig.shortLabel());
+        if (sigLower != null)
+            for (Atom piAtom : sigLower)
+                if (!lower.contains(factory.tuple(piAtom.label()))) {
+                    Tuple atom = removeAtomByName(atoms, piAtom.label());
+                    lower.add(atom);
+                    upper.add(atom);
+                }
         boolean isExact = sc.isExact(sig);
         if (isExact || sig.isTopLevel()) for(n=n-upper.size(); n>0; n--) {
            Tuple atom = atoms.remove(atoms.size()-1);
+           if (!(atom.atom(0).toString().startsWith(sig.shortLabelNoPI()) || sig.atomSigShortLabels().contains(atom.atom(0).toString()))) {
+               throw new ErrorFatal("wrong atom removed: atom = " + atom.toString() + "; sig = " + sig.shortLabelNoPI());
+           }
            // If MUST<SCOPE and s is exact, then add fresh atoms to both LOWERBOUND and UPPERBOUND.
            // If MUST<SCOPE and s is inexact but toplevel, then add fresh atoms to the UPPERBOUND.
            if (isExact) lower.add(atom);
@@ -96,22 +139,33 @@ final class BoundsComputer {
      * Precondition: sig is not a builtin sig
      */
     private void computeUpperBound(PrimSig sig) throws Err {
+        //TODO: check partial instance
+
         // Sig's upperbound is fully computed. We recursively compute the upperbound for children...
         TupleSet x = ub.get(sig).clone();
         // We remove atoms that MUST be in a subsig
         for(PrimSig c: sig.children()) x.removeAll(lb.get(c));
         // So now X is the set of atoms that MIGHT be in this sig, but MIGHT NOT be in any particular subsig.
-        // For each subsig that may need more atom, we say it could potentionally get any of the atom from X.
+        // For each subsig that may need more atom, we say it could potentially get any of the atom from X.
         for(PrimSig c: sig.children()) {
            if (sc.sig2scope(c) > lb.get(c).size()) ub.get(c).addAll(x);
            computeUpperBound(c);
         }
+
+        //[PI] remove
     }
 
     //==============================================================================================================//
 
+    private void allocateAtomSig(AtomSig sig) throws Err {
+        TupleSet lower = factory.setOf(sig.shortLabel());
+        Relation exp = sol.addRel(sig.label, lower, lower, true);
+        sol.addSig(sig, exp);
+    }
+
     /** Allocate relations for nonbuiltin PrimSigs bottom-up. */
     private Expression allocatePrimSig(PrimSig sig) throws Err {
+        for (AtomSig as: sig.atomSigs()) allocateAtomSig(as);
         // Recursively allocate all children expressions, and form the union of them
         Expression sum = null;
         for(PrimSig child:sig.children()) {
@@ -124,7 +178,7 @@ final class BoundsComputer {
         TupleSet lower = lb.get(sig).clone(), upper = ub.get(sig).clone();
         if (sum == null) {
            // If sig doesn't have children, then sig should make a fresh relation for itself
-           sum = sol.addRel(sig.label, lower, upper);
+           sum = sol.addRel(sig.label, lower, upper, false);
         } else if (sig.isAbstract == null) {
            // If sig has children, and sig is not abstract, then create a new relation to act as the remainder.
            for(PrimSig child:sig.children()) {
@@ -136,7 +190,7 @@ final class BoundsComputer {
               lower.removeAll(childTS);
               upper.removeAll(childTS);
            }
-           sum = sum.union(sol.addRel(sig.label+" remainder", lower, upper));
+           sum = sum.union(sol.addRel(sig.label+" remainder", lower, upper, false));
         }
         sol.addSig(sig, sum);
         return sum;
@@ -149,6 +203,18 @@ final class BoundsComputer {
         // We must not visit the same SubsetSig more than once, so if we've been here already, then return the old value right away
         Expression sum = sol.a2k(sig);
         if (sum!=null && sum!=Expression.NONE) return sum;
+        // check if it is a int subset sig and whether we have a bound for it
+        IntSubsetScope iss = sc.intsub2scope(sig);
+        if (iss != null) {
+            TupleSet ts = factory.noneOf(1);
+            for (int i : iss.intScope.enumerate()) {
+                ts.add(factory.tuple(""+i));
+            }
+            Relation r = sol.addRel(sig.label, ts, ts, false);
+            sol.addSig(sig, r);
+            return r;
+        }
+        
         // Recursively form the union of all parent expressions
         TupleSet ts = factory.noneOf(1);
         for(Sig parent:sig.parents) {
@@ -160,7 +226,7 @@ final class BoundsComputer {
         if (sig.exact) { sol.addSig(sig, sum); return sum; }
         // Allocate a relation for this subset sig, then bound it
         rep.bound("Sig "+sig+" in "+ts+"\n");
-        Relation r = sol.addRel(sig.label, null, ts);
+        Relation r = sol.addRel(sig.label, null, ts, false);
         sol.addSig(sig, r);
         // Add a constraint that it is INDEED a subset of the union of its parents
         sol.addFormula(r.in(sum), sig.isSubset);
@@ -208,6 +274,7 @@ final class BoundsComputer {
         if (ex instanceof ExprConstant) {
            switch(((ExprConstant)ex).op) {
               case EMPTYNESS: return Expression.NONE;
+              default:        break;
            }
         }
         if (ex==Sig.NONE) return Expression.NONE;
@@ -218,7 +285,7 @@ final class BoundsComputer {
     }
 
     /** Computes the bounds for sigs/fields, then construct a BoundsComputer object that you can query. */
-    private BoundsComputer(A4Reporter rep, A4Solution sol, ScopeComputer sc, Iterable<Sig> sigs) throws Err {
+    private BoundsComputer(IA4Reporter rep, A4Solution sol, ScopeComputer sc, Iterable<Sig> sigs) throws Err {
         this.sc = sc;
         this.factory = sol.getFactory();
         this.rep = rep;
@@ -233,6 +300,14 @@ final class BoundsComputer {
         // Bound the sigs
         for(Sig s:sigs) if (!s.builtin && s.isTopLevel()) allocatePrimSig((PrimSig)s);
         for(Sig s:sigs) if (s instanceof SubsetSig) allocateSubsetSig((SubsetSig)s);
+
+        if (sol.createAtomRelations()) {
+            for (Pair<String, PrimSig> p : sc.getNewAtoms()) {
+                AtomSig asig = new AtomSig(p.a, p.b);
+                allocateAtomSig(asig);
+            }
+        }
+
         // Bound the fields
         again:
         for(Sig s:sigs) {
@@ -260,13 +335,14 @@ final class BoundsComputer {
                  lastTS=TS;
               }
               if (firstTS.size()!=(n>0 ? 1 : 0) || nextTS.size() != n-1) break;
-              sol.addField(f1, sol.addRel(s.label+"."+f1.label, firstTS, firstTS));
-              sol.addField(f2, sol.addRel(s.label+"."+f2.label, nextTS, nextTS));
+              sol.addField(f1, sol.addRel(s.label+"."+f1.label, firstTS, firstTS, false));
+              sol.addField(f2, sol.addRel(s.label+"."+f2.label, nextTS, nextTS, false));
               rep.bound("Field "+s.label+"."+f1.label+" == "+firstTS+"\n");
               rep.bound("Field "+s.label+"."+f2.label+" == "+nextTS+"\n");
               continue again;
            }
            for(Field f:s.getFields()) {
+              Expression kkBound = sol.a2k(f.bound, true);
               boolean isOne = s.isOne!=null;
               if (isOne && f.decl().expr.mult()==ExprUnary.Op.EXACTLYOF) {
                  Expression sim = sim(f.decl().expr);
@@ -277,16 +353,96 @@ final class BoundsComputer {
                  }
               }
               Type t = isOne ? Sig.UNIV.type().join(f.type()) : f.type();
+              //compute upper
               TupleSet ub = factory.noneOf(t.arity());
               for(List<PrimSig> p:t.fold()) {
                  TupleSet upper=null;
+                 int col = 0;
                  for(PrimSig b:p) {
-                    TupleSet tmp = sol.query(true, sol.a2k(b), false);
+                    Expression kkExpr = sol.a2k(b);
+                    CommandScope scope = null;
+                    TupleSet tmp = null;
+                    if (col > 0 && kkExpr == ConstantExpression.INTS && (scope=extractScope(f.bound, col-1)) != null) {
+                        tmp = factory.setOf(scope.enumerateAsString().toArray());
+                    } else if (kkExpr == ConstantExpression.INTS && kkBound != null) {
+                        tmp = sol.query(true, kkBound, false);
+                    } else {
+                        tmp = sol.query(true, kkExpr, false);
+                    }
                     if (upper==null) upper=tmp; else upper=upper.product(tmp);
+                    col++;
                  }
                  ub.addAll(upper);
               }
-              Relation r = sol.addRel(s.label+"."+f.label, null, ub);
+              // compute bounds from partial instance
+              TupleSet piLb = null;
+              List<List<Atom>> fldLo = sc.pi.fldLower2(s.shortLabel(), f.label, ub.arity());
+              if (fldLo != null) piLb = toKodkodTupleSet(fldLo, ub.arity(), sigs);
+
+              // use only those explicitly specified in the partial instance
+              List<List<Atom>> fldHi = sc.pi.fldUpper2(s.shortLabel(), f.label, ub.arity());
+              if (fldHi != null) ub.retainAll(toKodkodTupleSet(fldHi, ub.arity(), sigs));
+              // additionally shrink for fixes
+              ArrayList<Fix> fixes = sc.pi.fixesForFld(s.shortLabel(), f.label);
+              if (fixes.size() > 0) {
+                 Aux[] fixAux = new Aux[fixes.size()];
+                 for (int i = 0; i < fixAux.length; i++) {
+                    Fix fix = fixes.get(i);
+                    fixAux[i] = new Aux(fix.idx, fix.atom.toString(), toKodkodTupleSet(sc.pi.fixValue(fix), ub.arity(), sigs));
+                 }
+                 Collection<Tuple> tuplesToRemove = new ArrayList<Tuple>();
+                 for (Tuple ubTuple: ub) {
+                    for (Aux fix : fixAux) {
+                       if (ubTuple.atom(fix.idx).equals(fix.atom.toString()))
+                          if (!fix.ts.contains(ubTuple))
+                             tuplesToRemove.add(ubTuple);
+                     }
+                 }
+                 ub.removeAll(tuplesToRemove);
+              }
+
+              //*******************************************************************************************
+              //TODO: temp testing, remove
+//              final Set<String> rels = new HashSet<String>(Arrays.asList("left", "right", "then", "elsen"));
+//              final Set<String> leftthen = new HashSet<String>(Arrays.asList("left", "then"));
+//              final Set<String> rightelsen = new HashSet<String>(Arrays.asList("right", "elsen"));
+//              if (rels.contains(f.label) && ub.size() > 0 && ub.arity() == 2) {
+//                 String[] prefixes = new String[] { 
+//                         "Nand", "And", "AndInv", "BvOr", "BvShl", "BvAnd", "GTE", "ITE"
+//                 };
+//                 Collection<Tuple> tuplesToRemove = new ArrayList<Tuple>();
+//                 for (Tuple ubTuple: ub) {
+//                    String lhsAtom = (String)ubTuple.atom(0);
+//                    String rhsAtom = (String)ubTuple.atom(1);
+//                    String[] lhsPrefixAndIndex = lhsAtom.split("\\$");
+//                    String[] rhsPrefixAndIndex = rhsAtom.split("\\$");
+//                    String prefix = null;
+//                    for (String p : prefixes) {
+//                       if (lhsPrefixAndIndex[0].endsWith(p) && rhsPrefixAndIndex[0].endsWith(p)) {
+//                           prefix = p;
+//                           break;
+//                       }
+//                    }
+//                    if (prefix != null) {
+//                        int lhsIdx = Integer.parseInt(lhsPrefixAndIndex[1]);
+//                        int rhsIdx = Integer.parseInt(rhsPrefixAndIndex[1]);
+//                        //if (lhsIdx >= rhsIdx) tuplesToRemove.add(ubTuple);
+//                        if (lhsIdx >= rhsIdx) tuplesToRemove.add(ubTuple);
+//                        if ((leftthen.contains(f.label) && rhsIdx > (lhsIdx*2)+1) ||
+//                            (rightelsen.contains(f.label) && rhsIdx > (lhsIdx+1)*2))
+//                                tuplesToRemove.add(ubTuple);
+//                    }
+//                 }
+//                 if (tuplesToRemove.size() > 0) {
+//                     int s1 = ub.size();
+//                     ub.removeAll(tuplesToRemove);
+//                     int s2 = ub.size();
+//                     rep.bound(" *** Partial order reduction for "+s.label+"."+f.label+": "+s1+" -> "+s2+"\n");
+//                 }
+//              }
+              //------------------
+
+              Relation r = sol.addRel(s.label+"."+f.label, piLb, ub, s.isAtom != null);
               sol.addField(f, isOne ? sol.a2k(s).product(r) : r);
            }
         }
@@ -321,9 +477,88 @@ final class BoundsComputer {
     }
 
     //==============================================================================================================//
+    
+    private Integer exprArity(Expr e) {
+        if ((e instanceof ExprVar) || (e instanceof Sig))
+            return 1;
+        if (e instanceof ExprUnary)
+            return exprArity(((ExprUnary) e).sub);
+        if (e instanceof ExprBinary) {
+            Integer l = exprArity(((ExprBinary) e).left);
+            if (l == null) return null;
+            Integer r = exprArity(((ExprBinary) e).right);
+            if (r == null) return null;
+            return l + r;
+        }
+        return null;
+    }
+    private CommandScope extractScope(Expr e, int col) {
+        Integer arity = exprArity(e);
+        if (arity == null) return null;
+        if (col >= arity) return null;
+        if (e instanceof ExprUnary) {
+            if (arity == 1 && col == 0)
+                return ((ExprUnary) e).scope;
+            else
+                return extractScope(((ExprUnary) e).sub, col);
+        }
+        if (e instanceof ExprBinary) {
+            Integer leftArity = exprArity(((ExprBinary) e).left);
+            if (leftArity == null) return null;
+            Integer rightArity = exprArity(((ExprBinary) e).right);
+            if (rightArity == null) return null;
+            if (col < leftArity)
+                return extractScope(((ExprBinary) e).left, col);
+            else
+                return extractScope(((ExprBinary) e).right, col - leftArity);
+        }
+        return null;
+    }
+
+    private TupleSet toKodkodTupleSet(List<List<Atom>> piTs, int arity, Iterable<Sig> sigs) throws ErrorFatal {
+        TupleSet ts = factory.noneOf(arity);
+        for (List<Atom> t : piTs) {
+            TupleSet tst = null;
+            for (Atom a : t) {
+                TupleSet curr;
+                if (a.allOf) {
+                    if ("Int".equals(a.label)) {
+                        curr = factory.setOf((Object[])sol.intScope().enumerateAsString().toArray());
+                    } else {
+                        curr = ub.get(findSig(sigs, a.label));
+                    }
+                } else {
+                    curr = factory.setOf(a.label());
+                }
+                if (curr == null) throw new ErrorFatal("nothing found for column " + a);
+                if (tst == null) tst = curr; else tst = tst.product(curr);
+            }
+            ts.addAll(tst);
+        }
+        return ts;
+    }
+
+    private static Object findSig(Iterable<Sig> sigs, String name) throws ErrorFatal {
+        for (Sig s: sigs) {
+            if (s.label.equals(name) || s.label.endsWith("/" + name))
+                return s;
+        }
+        throw new ErrorFatal(String.format("Sig %s not found", name));
+    }
 
     /** Assign each sig and field to some Kodkod relation or expression, then set the bounds. */
-    static void compute (A4Reporter rep, A4Solution sol, ScopeComputer sc, Iterable<Sig> sigs) throws Err {
+    static void compute (IA4Reporter rep, A4Solution sol, ScopeComputer sc, Iterable<Sig> sigs) throws Err {
         new BoundsComputer(rep, sol, sc, sigs);
+    }
+
+    class Aux {
+       public final int idx;
+       public final String atom;
+       public final TupleSet ts;
+       public Aux(int idx, String atom, TupleSet ts) {
+          this.idx = idx;
+          this.atom = atom;
+          this.ts = ts;
+       }
     }
 }

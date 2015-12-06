@@ -27,6 +27,8 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.Env;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorAPI;
@@ -35,12 +37,12 @@ import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Util;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Decl;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprBinary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprCall;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprFix;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprHasName;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprITE;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
@@ -49,15 +51,18 @@ import edu.mit.csail.sdg.alloy4compiler.ast.ExprQt;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
+import edu.mit.csail.sdg.alloy4compiler.ast.Module;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.SubsetSig;
-import edu.mit.csail.sdg.alloy4compiler.ast.Module;
+import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 
-/** Mutable; represents an instance. */
-
+/** Mutable; represents an instance.
+ *
+ * @deprecated - assumes (wrongly) that all integers within a bitwidth are used
+ */
+@Deprecated
 public final class SimInstance extends VisitReturn<Object> {
 
     /** The root module associated with this instance. */
@@ -357,9 +362,9 @@ public final class SimInstance extends VisitReturn<Object> {
         cacheForConstants.clear();
     }
 
-    /** Truncate the given integer based on the current chosen bitwidth (as string) plus 
+    /** Truncate the given integer based on the current chosen bitwidth (as string) plus
      *  a flag to indicate overflow */
-    private int trunc(int i) { 
+    private int trunc(int i) {
         int ret = (i<<(32-bitwidth)) >> (32-bitwidth);
         wasOverflow = ret != i;
         return ret;
@@ -451,8 +456,8 @@ public final class SimInstance extends VisitReturn<Object> {
               //[AM]
 //              if (x.left.type().is_int()) return trunc(cint(x.left)-cint(x.right)); else return cset(x.left).difference(cset(x.right));
               return cset(x.left).difference(cset(x.right));
-          case IMINUS: 
-              return trunc(cint(x.left)-cint(x.right)); 
+          case IMINUS:
+              return trunc(cint(x.left)-cint(x.right));
           case PLUS:
               return cset(x.left).union(cset(x.right));
               //[AM]
@@ -654,6 +659,10 @@ public final class SimInstance extends VisitReturn<Object> {
         if (ans instanceof SimTupleset) return (SimTupleset)ans; else throw new ErrorFatal("Unknown field "+x+" encountered during evaluation.");
     }
 
+    @Override public Expr visit(ExprFix x) throws Err {
+      throw new RuntimeException("unimplemented");
+    }
+
     /** Helper method for enumerating all possibilties for a quantification-expression. */
     private int enumerate(final TempList<SimTuple> store, int sum, final ExprQt x, final Expr body, final int i) throws Err { // if op is ALL NO SOME ONE LONE then it always returns 0 1 2
        final int n = x.count();
@@ -691,15 +700,15 @@ public final class SimInstance extends VisitReturn<Object> {
         if (xx instanceof ExprQt) x = (ExprQt)xx; else return visitThis(xx);
         if (x.op == ExprQt.Op.COMPREHENSION) {
            TempList<SimTuple> ans = new TempList<SimTuple>();
-           enumerate(ans, 0, x, x.sub, 0);
+           enumerate(ans, 0, x, x.fullSub(), 0);
            return SimTupleset.make(ans.makeConst());
         }
-        if (x.op == ExprQt.Op.ALL)  return enumerate(null, 0, x, x.sub.not(), 0) == 0;
-        if (x.op == ExprQt.Op.NO)   return enumerate(null, 0, x, x.sub,       0) == 0;
-        if (x.op == ExprQt.Op.SOME) return enumerate(null, 0, x, x.sub,       0) >= 1;
-        if (x.op == ExprQt.Op.LONE) return enumerate(null, 0, x, x.sub,       0) <= 1;
-        if (x.op == ExprQt.Op.ONE)  return enumerate(null, 0, x, x.sub,       0) == 1;
-        if (x.op == ExprQt.Op.SUM)  return trunc(enumerate(null, 0, x, x.sub, 0));
+        if (x.op == ExprQt.Op.ALL)  return enumerate(null, 0, x, x.fullSub().not(), 0) == 0;
+        if (x.op == ExprQt.Op.NO)   return enumerate(null, 0, x, x.fullSub(),       0) == 0;
+        if (x.op == ExprQt.Op.SOME) return enumerate(null, 0, x, x.fullSub(),       0) >= 1;
+        if (x.op == ExprQt.Op.LONE) return enumerate(null, 0, x, x.fullSub(),       0) <= 1;
+        if (x.op == ExprQt.Op.ONE)  return enumerate(null, 0, x, x.fullSub(),       0) == 1;
+        if (x.op == ExprQt.Op.SUM)  return trunc(enumerate(null, 0, x, x.fullSub(), 0));
         throw new ErrorFatal(x.pos, "Unsupported operator ("+x.op+") encountered during ExprQt.accept()");
     }
 

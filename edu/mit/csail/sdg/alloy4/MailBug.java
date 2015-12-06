@@ -15,19 +15,20 @@
 
 package edu.mit.csail.sdg.alloy4;
 
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.Map;
-import java.util.prefs.BackingStoreException;
-import java.util.prefs.Preferences;
+import java.awt.Color;
+import java.awt.Dimension;
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.URL;
 import java.net.URLConnection;
-import java.awt.Color;
-import java.awt.Dimension;
+import java.util.Map;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
+
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;

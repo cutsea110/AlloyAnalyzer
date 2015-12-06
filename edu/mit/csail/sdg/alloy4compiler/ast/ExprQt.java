@@ -15,19 +15,21 @@
 
 package edu.mit.csail.sdg.alloy4compiler.ast;
 
+import static edu.mit.csail.sdg.alloy4compiler.ast.Type.EMPTY;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
-import edu.mit.csail.sdg.alloy4.Pos;
+
+import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
-import edu.mit.csail.sdg.alloy4.ErrorWarning;
 import edu.mit.csail.sdg.alloy4.ErrorType;
-import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ErrorWarning;
 import edu.mit.csail.sdg.alloy4.JoinableList;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Type.EMPTY;
+import edu.mit.csail.sdg.alloy4.Pos;
 
 /** Immutable; represents a quantified expression.
  *
@@ -56,6 +58,9 @@ public final class ExprQt extends Expr {
    /** The unmodifiable list of variables. */
    public final ConstList<Decl> decls;
 
+   /** The domain restriction expression. */
+   public final Expr dom;
+
    /** The body of the quantified expression. */
    public final Expr sub;
 
@@ -67,6 +72,11 @@ public final class ExprQt extends Expr {
       int n = 0;
       for(Decl d: decls) n = n + d.names.size();
       return n;
+   }
+
+   public Expr fullSub() {
+       if (op == Op.ALL) return dom.implies(sub);
+       return dom.and(sub);
    }
 
    /** Return the i-th variable. */
@@ -97,7 +107,7 @@ public final class ExprQt extends Expr {
       // We intentionally do NOT merge the VAR's position into the span.
       // That allows us to control the highlighting of this component
       // simply by deciding this.pos and this.closingBracket
-      if (p == null) span = (p = pos.merge(closingBracket).merge(sub.span()));
+      if (p == null) span = (p = pos.merge(closingBracket).merge(dom.span()).merge(sub.span()));
       return p;
    }
 
@@ -105,6 +115,7 @@ public final class ExprQt extends Expr {
 
    /** {@inheritDoc} */
    @Override public void toString(StringBuilder out, int indent) {
+      Expr sub = fullSub();
       if (indent<0) {
          boolean first = true;
          if (op!=Op.COMPREHENSION) out.append('(').append(op).append(' '); else out.append('{');
@@ -124,10 +135,11 @@ public final class ExprQt extends Expr {
    //=============================================================================================================//
 
    /** Constructs a new quantified expression. */
-   private ExprQt (Pos pos, Pos closingBracket, Op op, Type type, ConstList<Decl> decls, Expr sub, boolean ambiguous, long weight, JoinableList<Err> errs) {
+   private ExprQt (Pos pos, Pos closingBracket, Op op, Type type, ConstList<Decl> decls, Expr dom, Expr sub, boolean ambiguous, long weight, JoinableList<Err> errs) {
       super(pos, closingBracket, ambiguous, type, 0, weight, errs);
       this.op = op;
       this.decls = decls;
+      this.dom = dom;
       this.sub = sub;
    }
 
@@ -157,12 +169,18 @@ public final class ExprQt extends Expr {
        * @param sub - the body of the expression
        */
       public final Expr make(Pos pos, Pos closingBracket, List<Decl> decls, Expr sub) {
+          return make(pos, closingBracket, decls, null, sub);
+      }
+      public final Expr make(Pos pos, Pos closingBracket, List<Decl> decls, Expr dom, Expr sub) {
+         JoinableList<Err> errs = emptyListOfErrors;
+         if (dom == null) dom = ExprConstant.TRUE;
          Type t = this==SUM ? Type.smallIntType() : (this==COMPREHENSION ? Type.EMPTY : Type.FORMULA);
          if (this!=SUM) sub = sub.typecheck_as_formula(); else sub = sub.typecheck_as_int();
-         boolean ambiguous = sub.ambiguous;
-         JoinableList<Err> errs = emptyListOfErrors;
+         dom = dom.typecheck_as_formula();
+         boolean ambiguous = dom.ambiguous || sub.ambiguous;
+         if (dom.mult!=0) errs = errs.make(new ErrorSyntax(dom.span(), "Multiplicity expression not allowed here."));
          if (sub.mult!=0) errs = errs.make(new ErrorSyntax(sub.span(), "Multiplicity expression not allowed here."));
-         long weight = sub.weight;
+         long weight = dom.weight + sub.weight;
          if (decls.size()==0) errs = errs.make(new ErrorSyntax(pos, "List of variables cannot be empty."));
          for(Decl d: decls) {
             Expr v = d.expr;
@@ -176,26 +194,26 @@ public final class ExprQt extends Expr {
             }
             ExprUnary.Op op = v.mult();
             if (op==ExprUnary.Op.EXACTLYOF) { errs = errs.make(new ErrorType(v.span(), "This cannot be an exactly-of expression.")); continue; }
-            if (this!=SUM && this!=COMPREHENSION) continue;
-            if (!v.type.hasArity(1)) {
-               errs = errs.make(new ErrorType(v.span(), "This must be a unary set. Instead, its type is " + v.type));
-               continue;
-            }
-            if (v.mult==1) {
-               if (op == ExprUnary.Op.SETOF)
-                  errs = errs.make(new ErrorType(v.span(), "This cannot be a set-of expression."));
-               else if (op == ExprUnary.Op.SOMEOF)
-                  errs = errs.make(new ErrorType(v.span(), "This cannot be a some-of expression."));
-               else if (op == ExprUnary.Op.LONEOF)
-                  errs = errs.make(new ErrorType(v.span(), "This cannot be a lone-of expression."));
-            }
-            if (this==COMPREHENSION) {
-               Type t1 = v.type.extract(1);
+            if (this==SUM) {
+                if (!v.type.hasArity(1)) {
+                   errs = errs.make(new ErrorType(v.span(), "This must be a unary set. Instead, its type is " + v.type));
+                   continue;
+                }
+                if (v.mult==1) {
+                   if (op == ExprUnary.Op.SETOF)
+                      errs = errs.make(new ErrorType(v.span(), "This cannot be a set-of expression."));
+                   else if (op == ExprUnary.Op.SOMEOF)
+                      errs = errs.make(new ErrorType(v.span(), "This cannot be a some-of expression."));
+                   else if (op == ExprUnary.Op.LONEOF)
+                      errs = errs.make(new ErrorType(v.span(), "This cannot be a lone-of expression."));
+                }
+            } else if (this==COMPREHENSION) {
+               Type t1 = v.type;
                for(int n=d.names.size(); n>0; n--) if (t==EMPTY) t = t1; else t = t.product(t1);
             }
          }
          if (errs.isEmpty()) errs = sub.errors; // if the vars have errors, then the subexpression's errors will be too confusing, so let's skip them
-         return new ExprQt(pos, closingBracket, this, t, ConstList.make(decls), sub, ambiguous, weight, errs);
+         return new ExprQt(pos, closingBracket, this, t, ConstList.make(decls), dom, sub, ambiguous, weight, errs);
       }
 
       /** Returns the human readable label for this operator */
@@ -212,7 +230,7 @@ public final class ExprQt extends Expr {
             for(ExprHasName n: decls.get(i).names) {
                ExprVar x = (ExprVar)n;
                for(int j=i+1; j<decls.size(); j++) if (decls.get(j).expr.hasVar(x)) continue again;
-               if (!sub.hasVar(x)) warns.add(new ErrorWarning(x.pos, "This variable is unused."));
+               if (!dom.hasVar(x) && !sub.hasVar(x)) warns.add(new ErrorWarning(x.pos, "This variable is unused."));
             }
          }
       }
@@ -250,14 +268,14 @@ public final class ExprQt extends Expr {
          case ALL: sub = guard.implies(this.sub); break;
          default: sub = guard.and(this.sub);
       }
-      return op.make(pos, closingBracket, newdecls.makeConst(), sub);
+      return op.make(pos, closingBracket, newdecls.makeConst(), dom, sub);
    }
 
    //=============================================================================================================//
 
    /** {@inheritDoc} */
    public int getDepth() {
-      int max = sub.getDepth();
+      int max = Math.max(dom.getDepth(), sub.getDepth());
       for(Decl d: decls) for(ExprHasName x: d.names) { int tmp = x.getDepth(); if (max<tmp) max=tmp; }
       return 1 + max;
    }
@@ -279,6 +297,7 @@ public final class ExprQt extends Expr {
       for(Decl d: decls) for(ExprHasName v: d.names) {
          ans.add(make(v.pos, v.pos, "<b>var</b> "+v.label+" <i>"+v.type+"</i>", d.expr));
       }
+      ans.add(make(dom.span(), dom.span(), "<b>domain</b>", dom));
       ans.add(make(sub.span(), sub.span(), "<b>body</b>", sub));
       return ans;
    }

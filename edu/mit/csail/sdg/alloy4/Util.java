@@ -48,7 +48,7 @@ public final class Util {
 
    /** This constructor is private, since this utility class never needs to be instantiated. */
    private Util() { }
-   
+
    /** Copy the input list, append "element" to it, then return the result as an unmodifiable list. */
    public static<T> ConstList<T> append(List<T> list, T element) {
       TempList<T> ans = new TempList<T>(list.size()+1);
@@ -256,6 +256,16 @@ public final class Util {
       try { return file.getCanonicalPath(); } catch(IOException ex) { return file.getAbsolutePath(); }
    }
 
+   public static final String dirname(String filename) {
+       int i = filename.lastIndexOf(File.separatorChar);
+       return (i < 0) ? "" : filename.substring(0, i);
+   }
+
+   public static String basename(String filename) {
+       int i = filename.lastIndexOf(File.separatorChar);
+       return (i < 0) ? filename : filename.substring(i+1, filename.length());
+   }
+
    /** Sorts two strings for optimum module order; we guarantee slashComparator(a,b)==0 iff a.equals(b).
     * <br> (1) First of all, the builtin names "extend" and "in" are sorted ahead of other names
     * <br> (2) Else, if one string starts with "this/", then it is considered smaller
@@ -323,8 +333,7 @@ public final class Util {
       args[0] = "/bin/chmod"; // This does not work on Windows, but the "executable" bit is not needed on Windows anyway.
       args[1] = (executable ? "700" : "600"); // 700 means read+write+executable; 600 means read+write.
       int j=2;
-      for(int i=0; i<names.length; i++) {
-         String name = names[i];
+      for(String name: names) {
          String destname = name;
          if (!keepPath) { int ii=destname.lastIndexOf('/'); if (ii>=0) destname=destname.substring(ii+1); }
          destname=(destdir+'/'+destname).replace('/', File.separatorChar);
@@ -342,7 +351,7 @@ public final class Util {
       }
    }
 
-   /** Copy file.content[from...f.length-1] into file.content[to...], then truncate the file after that point.
+/** Copy file.content[from...f.length-1] into file.content[to...], then truncate the file after that point.
     * <p> If (from &gt; to), this means we simply delete the portion of the file beginning at "to" and up to but excluding "from".
     * <p> If (from &lt; to), this means we insert (to-from) number of ARBITRARY bytes into the "from" location
     *     and shift the original file content accordingly.
@@ -526,12 +535,44 @@ public final class Util {
    public static String tail(String string)  { int i=string.lastIndexOf('/'); return (i<0) ? string : string.substring(i+1); }
 
    /** Returns the largest allowed integer, or -1 if no integers are allowed (bitwidth < 1). */
-   public static int max(int bitwidth) { return bitwidth < 1 ? -1 : (1<<(bitwidth-1))-1; }
-   
+   public static int max(int bitwidth) { return (int) (bitwidth < 1 ? -1 : (1L<<(bitwidth-1))-1); }
+
    /** Returns the smallest allowed integer, or 0 if no integers are allowed (bitwidth < 1)*/
-   public static int min(int bitwidth) { return bitwidth < 1 ?  0 : 0-(1<<(bitwidth-1)); }
+   public static int min(int bitwidth) { return (int) (bitwidth < 1 ?  0 : 0-(1L<<(bitwidth-1))); }
+
+   /** Returns the smallest bitwdith sufficient for representing `val` in two's complement */
+   public static int minBw(int val) { return val >= 0 ? (int)Math.ceil(Math.log(val+1)/Math.log(2)) + 1 : (int)Math.ceil(Math.log(-val)/Math.log(2)) + 1; }
+
+   /** Returns the smallest bitwdith sufficient for representing both `min` and `max` in two's complement */
+   public static int minBw(int min, int max) { return Math.max(Util.minBw(min), Util.minBw(max)); }
 
    /** Returns a mask of the form 000..0011..11 where the number of 1s is equal to the number of significant bits of the highest integer withing the given bitwidth */
    public static int shiftmask(int bitwidth) { return bitwidth < 1 ? 0 : (1 << (32 - Integer.numberOfLeadingZeros(bitwidth-1))) - 1; }
+
+   /** Whether the 'debug' environment variable is set to 'yes' */
+   public static boolean isDebug() {
+       return "yes".equals(System.getProperty("debug"));
+   }
+
+   /** Returns a string representing all iterable elements joined together separated by given 'sep' */
+   public static String join(Iterable<String> items, String sep) { return join(items, sep, false, false); }
+   public static String join(Iterable<String> items, String sep, boolean addSepAsPrefix, boolean addSepAsSuffix) {
+      String ans = "";
+      if (items == null) return ans;
+      if (addSepAsPrefix) ans += sep;
+      int cnt = 0;
+      for (String item : items) {
+          if (cnt > 0) ans += sep;
+          ans += item.toString();
+          cnt++;
+      }
+      if (addSepAsSuffix) ans += sep;
+      return ans;
+   }
+
+   public static String trim(String str, int maxSize) {
+      if (str.length() <= maxSize || maxSize <= 4) return str;
+      return str.substring(0, maxSize - 4) + " ...";
+   }
 
 }

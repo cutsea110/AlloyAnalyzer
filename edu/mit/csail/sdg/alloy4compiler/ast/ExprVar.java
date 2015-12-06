@@ -18,9 +18,10 @@ package edu.mit.csail.sdg.alloy4compiler.ast;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.Pos;
+
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.Pos;
 
 /** Immutable; represents a LET or QUANTIFICATION variable in the AST.
  *
@@ -29,10 +30,13 @@ import edu.mit.csail.sdg.alloy4.ErrorWarning;
 
 public final class ExprVar extends ExprHasName {
 
+    public final CommandScope scope;
+
     /** {@inheritDoc} */
     @Override public void toString(StringBuilder out, int indent) {
         if (indent<0) {
             out.append(label);
+            if (scope != null) out.append("(" + scope + ")");
         } else {
             for(int i=0; i<indent; i++) { out.append(' '); }
             out.append("Var ").append(label).append(" at position <").append(pos).append("> with type=").append(type).append('\n');
@@ -40,8 +44,9 @@ public final class ExprVar extends ExprHasName {
     }
 
     /** Constructs an ExprVar object */
-    private ExprVar(Pos pos, String label, Type type) {
+    private ExprVar(Pos pos, String label, Type type, CommandScope scope) {
         super(pos, label, type);
+        this.scope = scope;
     }
 
     /** Constructs an ExprVar variable with the EMPTY type
@@ -49,7 +54,7 @@ public final class ExprVar extends ExprHasName {
      * @param label - the label for this variable (it is only used for pretty-printing and does not have to be unique)
      */
     public static ExprVar make(Pos pos, String label) {
-        return new ExprVar(pos, label, Type.EMPTY);
+        return make(pos, label, Type.EMPTY);
     }
 
     /** Constructs an ExprVar variable with the given type
@@ -58,7 +63,15 @@ public final class ExprVar extends ExprHasName {
      * @param type - the type
      */
     public static ExprVar make(Pos pos, String label, Type type) {
-        return new ExprVar(pos, label, type);
+        return make(pos, label, type, null);
+    }
+
+    public static ExprVar make(Pos pos, String label, CommandScope scope) {
+        return make(pos, label, Type.EMPTY, scope);
+    }
+
+    public static ExprVar make(Pos pos, String label, Type type, CommandScope scope) {
+        return new ExprVar(pos, label, type, scope);
     }
 
     /** {@inheritDoc} */
@@ -72,4 +85,5 @@ public final class ExprVar extends ExprHasName {
 
     /** {@inheritDoc} */
     @Override public List<? extends Browsable> getSubnodes() { return new ArrayList<Browsable>(0); }
+
 }

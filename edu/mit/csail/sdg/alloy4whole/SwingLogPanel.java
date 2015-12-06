@@ -25,6 +25,7 @@ import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
+
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -40,12 +41,22 @@ import javax.swing.text.StyledDocument;
 import javax.swing.text.StyledEditorKit;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+
 import edu.mit.csail.sdg.alloy4.OurAntiAlias;
 import edu.mit.csail.sdg.alloy4.OurUtil;
 
 /** This helper method is used by SimpleGUI; only the AWT Event Thread may call methods in this class. */
 
 final class SwingLogPanel {
+
+    public static final String[] paletteHex = new String[] {"#000000", "#2E8B57", "#FF00FF", "#696969", "#FF1493", "#A0522D", "#9932CC", "#008B8B", "#228B22", "#556B2F", "#8A2BE2", "#008080", "#C71585", "#8B4513", "#A52A2A", "#FF0000", "#008000", "#483D8B", "#2F4F4F", "#9400D3", "#006400", "#8B008B", "#8B0000", "#4B0082", "#191970", "#0000FF"};
+
+    public static Color hex2Rgb(String colorStr) {
+        return new Color(
+                Integer.valueOf(colorStr.substring(1, 3), 16),
+                Integer.valueOf(colorStr.substring(3, 5), 16),
+                Integer.valueOf(colorStr.substring(5, 7), 16));
+    }
 
     /** Try to wrap the input to about 60 characters per line; however, if a token is too long, we won't break it. */
     private static void linewrap(StringBuilder sb, String msg) {
@@ -82,6 +93,8 @@ final class SwingLogPanel {
 
     /** The style to use when writing red messages. */
     private final Style styleRed;
+
+    private final Style[] palette, paletteBold;
 
     /** This stores the JLabels used for displaying hyperlinks. */
     private final List<JLabel> links = new ArrayList<JLabel>();
@@ -136,19 +149,7 @@ final class SwingLogPanel {
                         if (!AbstractDocument.SectionElementName.equals(x.getName())) return defaultFactory.create(x);
                         return new BoxView(x, View.Y_AXIS) {
                             @Override public final float getMinimumSpan(int axis) { return super.getPreferredSpan(axis); }
-                            @Override public final void layout(int width,int height) {
-                                int x = 0;
-                                int dec = 20;
-                                int w = 30000 + dec;
-                                while (x++ < 10) {
-                                    try {
-                                        super.layout(w - (int)Math.pow(2, x-1)*dec, height);
-                                        break;
-                                    } catch (Exception e) {
-                                        //System.out.println("---------error for ww = " + ww);
-                                    }
-                                }
-                            }
+                            @Override public final void layout(int width,int height) { super.layout(30000, height); }
                         };
                     }
                 };
@@ -170,6 +171,22 @@ final class SwingLogPanel {
         StyleConstants.setForeground(styleRed, red);
         parent.setViewportView(log);
         parent.setBackground(background);
+        this.palette = new Style[paletteHex.length];
+        this.paletteBold = new Style[paletteHex.length];
+        for (int i = 0; i < palette.length; i++) {
+            Style st = doc.addStyle("palette" + i, null);
+            palette[i] = st;
+            StyleConstants.setFontFamily(st, fontName);
+            StyleConstants.setFontSize(st, fontSize);
+            StyleConstants.setForeground(st, hex2Rgb(paletteHex[i]));
+
+            st = doc.addStyle("paletteBold" + i, null);
+            paletteBold[i] = st;
+            StyleConstants.setFontFamily(st, fontName);
+            StyleConstants.setFontSize(st, fontSize);
+            StyleConstants.setBold(st, true);
+            StyleConstants.setForeground(st, hex2Rgb(paletteHex[i]));
+        }
     }
 
     /** Write a horizontal separator into the log window. */
@@ -189,9 +206,10 @@ final class SwingLogPanel {
     }
 
     /** Write a clickable link into the log window. */
-    public void logLink(final String link, final String linkDestination) {
+    public void logLink(final String link, final String linkDestination)                    { logLink(null, link, linkDestination); }
+    public void logLink(final Integer pos, final String link, final String linkDestination) {
         if (log==null || link.length()==0) return;
-        if (linkDestination==null || linkDestination.length()==0) { log(link); return; }
+        if (linkDestination==null || linkDestination.length()==0) { flush(); logAt(pos, link); return; }
         clearError();
         StyledDocument doc = log.getStyledDocument();
         Style linkStyle = doc.addStyle("link", styleRegular);
@@ -207,7 +225,7 @@ final class SwingLogPanel {
         });
         StyleConstants.setComponent(linkStyle, label);
         links.add(label);
-        reallyLog(".", linkStyle); // Any character would do; the "." will be replaced by the JLabel
+        reallyLog(pos, ".", linkStyle); // Any character would do; the "." will be replaced by the JLabel
         log.setCaretPosition(doc.getLength());
         lastSize = doc.getLength();
     }
@@ -216,16 +234,18 @@ final class SwingLogPanel {
     public void log(String msg) { if (log!=null && msg.length()>0) batch.add(msg); }
 
     /** Write "msg" in bold style. */
-    public void logBold(String msg) { if (msg.length()>0) {clearError(); reallyLog(msg, styleBold);} }
+    public void logBold(String msg)            { if (msg.length()>0) {clearError(); reallyLog(msg, styleBold);} }
+    public void logBoldAt(int pos, String msg) { if (msg.length()>0) {clearError(); reallyLog(pos, msg, styleBold);} }
 
-    private void reallyLog(String text, Style style) {
+    private void reallyLog(String text, Style style) { reallyLog(null, text, style); }
+    private void reallyLog(Integer pos, String text, Style style) {
         if (log==null || text.length()==0) return;
         int i=text.lastIndexOf('\n'), j=text.lastIndexOf('\r');
         if (i>=0 && i<j) { i=j; }
         StyledDocument doc=log.getStyledDocument();
         try {
-            if (i<0) {
-                doc.insertString(doc.getLength(), text, style);
+            if (i<0 || pos != null) {
+                doc.insertString(pos != null ? pos : doc.getLength(), text, style);
             } else {
                 // Performs intelligent caret positioning
                 doc.insertString(doc.getLength(), text.substring(0,i+1), style);
@@ -239,6 +259,9 @@ final class SwingLogPanel {
         }
         if (style!=styleRed) { lastSize=doc.getLength(); }
     }
+
+    public void logAt(Integer pos, String text)              { logAt(pos, text, styleRegular); }
+    public void logAt(Integer pos, String text, Style style) { reallyLog(pos, text, style); }
 
     /** Write "msg" in red style (with automatic line wrap). */
     public void logRed (String msg) {
@@ -361,5 +384,12 @@ final class SwingLogPanel {
     public void flush() {
         if (log==null) return;
         if (batch.size()>0) clearError();
+    }
+
+    public void logPaletteBold(String text, int paletteIdx)                 { logPalette(paletteBold, text, paletteIdx); }
+    public void logPalette(String text, int paletteIdx)                     { logPalette(palette, text, paletteIdx); }
+    private void logPalette(Style[] palette, String text, int paletteIdx) {
+        flush();
+        reallyLog(text, palette[paletteIdx % palette.length]);
     }
 }

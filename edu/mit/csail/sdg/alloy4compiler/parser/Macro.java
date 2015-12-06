@@ -17,6 +17,7 @@ package edu.mit.csail.sdg.alloy4compiler.parser;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
@@ -121,6 +122,6 @@ final class Macro extends ExprCustom {
 
     /** {@inheritDoc} */
     @Override public List<? extends Browsable> getSubnodes() { return new ArrayList<Browsable>(0); }
-    
-    
+
+
 }

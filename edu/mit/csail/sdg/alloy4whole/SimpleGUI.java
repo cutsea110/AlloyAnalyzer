@@ -25,8 +25,15 @@ import static edu.mit.csail.sdg.alloy4.A4Preferences.CoreGranularity;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.CoreMinimization;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.FontName;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.FontSize;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLForceIncInd;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLMaxIter;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLSaveCandidates;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLSaveCex;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLSaveFormulas;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.HOLSavePI;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.ImplicitThis;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.InferPartialInstance;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.KeyBindings;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.LAF;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Model0;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Model1;
@@ -36,16 +43,20 @@ import static edu.mit.csail.sdg.alloy4.A4Preferences.NoOverflow;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.RecordKodkod;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SkolemDepth;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Solver;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.SolverThreads;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.SolverThreadsShareClauses;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SubMemory;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SubStack;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SyntaxDisabled;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.TabSize;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Unrolls;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.UseHOLSolver;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.VerbosityPref;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.WarningNonfatal;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Welcome;
 import static edu.mit.csail.sdg.alloy4.OurUtil.menu;
 import static edu.mit.csail.sdg.alloy4.OurUtil.menuItem;
+import static java.awt.event.InputEvent.CTRL_MASK;
 import static java.awt.event.KeyEvent.VK_A;
 import static java.awt.event.KeyEvent.VK_ALT;
 import static java.awt.event.KeyEvent.VK_E;
@@ -58,26 +69,38 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
+import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.Action;
 import javax.swing.Box;
@@ -120,6 +143,7 @@ import com.apple.eawt.ApplicationEvent;
 import edu.mit.csail.sdg.alloy4.A4Preferences;
 import edu.mit.csail.sdg.alloy4.A4Preferences.BooleanPref;
 import edu.mit.csail.sdg.alloy4.A4Preferences.ChoicePref;
+import edu.mit.csail.sdg.alloy4.A4Preferences.IntPref;
 import edu.mit.csail.sdg.alloy4.A4Preferences.Pref;
 import edu.mit.csail.sdg.alloy4.A4Preferences.StringPref;
 import edu.mit.csail.sdg.alloy4.A4Preferences.Verbosity;
@@ -316,9 +340,66 @@ public final class SimpleGUI implements ComponentListener, Listener {
         int c = t.getCaret();
         int y = t.getLineOfOffset(c)+1;
         int x = c - t.getLineStartOffset(y-1)+1;
-        status.setText("<html>&nbsp; Line "+y+", Column "+x
-              +(t.modified()?" <b style=\"color:#B43333;\">[modified]</b></html>":"</html>"));
+        String statusText = "<html>&nbsp; Line "+y+", Column "+x;
+        if (t.modified()) statusText += " <b style=\"color:#B43333;\">[modified]</b>";
+        if (inSearchMode()) {
+            statusText += "&nbsp;";
+            if (searchOutcome() < 0) statusText += " Failing ";
+            if (searchOutcome() > 0) statusText += " Wrapped ";
+            String kind = searchKind.label();
+            statusText += kind + (searchingBackward() ? " backward" : "") + ": " + fullSearchQuery();
+            if (currSearchStatus != null) {
+                statusText += ": " + currSearchStatus;
+            }
+            if (currSearchSuggestions != null) {
+                String sugs = "";
+                for (String sug : currSearchSuggestions.keySet())
+                    sugs += (sugs.length() > 0 ? " | " : "<b>") + sug + (sugs.length() > 0 ? "" : "</b>");
+                if (sugs.length() == 0)
+                    statusText += " [No match]";
+                else
+                    statusText += " {" + Util.trim(sugs, 120) + "}";
+            }
+        }
+        if (keyCombo.size() > 0) {
+            statusText += "&nbsp;" + printKeyCombos();
+        }
+        if (currentCommand != null) {
+            statusText += "&nbsp;(" + currentCommand + ")";
+        }
+        statusText += "</html>";
+        status.setText(statusText);
         return null;
+    }
+
+    private String printKeyCombos() {
+        String ans = "";
+        for (KeyEvent ke : keyCombo) {
+            if (ans.length() > 0) ans += " ";
+            ans += printKeyEvent(ke);
+        }
+        return ans;
+    }
+
+    private String printKeyEvent(KeyEvent ke) {
+        String ans = "";
+        if (ke.isControlDown()) ans += "C-";
+        if (ke.isAltDown()) ans += "M-";
+        if (ke.isMetaDown()) ans += "s-";
+//        if (ke.isShiftDown()) ans += "S-";
+        if (ke.getKeyChar() == KeyEvent.CHAR_UNDEFINED) {
+            ans += KeyEvent.getKeyText(ke.getKeyCode());
+        } else {
+            int keyCharInt = (int) ke.getKeyChar();
+            if (keyCharInt > 0 && keyCharInt <= 26) {
+                keyCharInt += 96;
+                if (ke.isShiftDown()) keyCharInt -= 32;
+            }
+            ans += (char)keyCharInt;
+        }
+//        if (ke.getKeyCode() == 0) ans += ke.getKeyChar();
+//        else                      ans += KeyEvent.getKeyText(ke.getKeyCode());
+        return ans;
     }
 
     /** Helper method that returns a hopefully very short name for a file name. */
@@ -363,7 +444,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
            arch+"/libminisat.so", arch+"/libminisatx1.so", arch+"/libminisat.jnilib", arch+"/libminisat.dylib",
            arch+"/libminisatprover.so", arch+"/libminisatproverx1.so", arch+"/libminisatprover.jnilib", arch+"/libminisatprover.dylib",
            arch+"/libzchaff.so", arch+"/libzchaffmincost.so", arch+"/libzchaffx1.so", arch+"/libzchaff.jnilib",
-           arch+"/liblingeling.so", arch+"/liblingeling.dylib", arch+"/liblingeling.jnilib", arch+"/plingeling",
+           arch+"/liblingeling.so", arch+"/liblingeling.dylib", arch+"/liblingeling.jnilib",arch+"/plingeling",
            arch+"/libglucose.so", arch+"/libglucose.dylib", arch+"/libglucose.jnilib",
            arch+"/libcryptominisat.so", arch+"/libcryptominisat.la", arch+"/libcryptominisat.dylib", arch+"/libcryptominisat.jnilib",
            arch+"/berkmin", arch+"/spear", arch+"/cryptominisat");
@@ -373,60 +454,63 @@ public final class SimpleGUI implements ComponentListener, Listener {
            arch+"/glucose.dll", arch+"/cygglucose.dll", arch+"/libglucose.dll.a",
            arch+"/zchaff.dll", arch+"/berkmin.exe", arch+"/spear.exe");
         // Copy the model files
-        Util.copy(false, true, alloyHome(),
-           "models/book/appendixA/addressBook1.als", "models/book/appendixA/addressBook2.als", "models/book/appendixA/barbers.als",
-           "models/book/appendixA/closure.als", "models/book/appendixA/distribution.als", "models/book/appendixA/phones.als",
-           "models/book/appendixA/prison.als", "models/book/appendixA/properties.als", "models/book/appendixA/ring.als",
-           "models/book/appendixA/spanning.als", "models/book/appendixA/tree.als", "models/book/appendixA/tube.als", "models/book/appendixA/undirected.als",
-           "models/book/appendixE/hotel.thm", "models/book/appendixE/p300-hotel.als", "models/book/appendixE/p303-hotel.als", "models/book/appendixE/p306-hotel.als",
-           "models/book/chapter2/addressBook1a.als", "models/book/chapter2/addressBook1b.als", "models/book/chapter2/addressBook1c.als",
-           "models/book/chapter2/addressBook1d.als", "models/book/chapter2/addressBook1e.als", "models/book/chapter2/addressBook1f.als",
-           "models/book/chapter2/addressBook1g.als", "models/book/chapter2/addressBook1h.als", "models/book/chapter2/addressBook2a.als",
-           "models/book/chapter2/addressBook2b.als", "models/book/chapter2/addressBook2c.als", "models/book/chapter2/addressBook2d.als",
-           "models/book/chapter2/addressBook2e.als", "models/book/chapter2/addressBook3a.als", "models/book/chapter2/addressBook3b.als",
-           "models/book/chapter2/addressBook3c.als", "models/book/chapter2/addressBook3d.als", "models/book/chapter2/theme.thm",
-           "models/book/chapter4/filesystem.als", "models/book/chapter4/grandpa1.als",
-           "models/book/chapter4/grandpa2.als", "models/book/chapter4/grandpa3.als", "models/book/chapter4/lights.als",
-           "models/book/chapter5/addressBook.als", "models/book/chapter5/lists.als", "models/book/chapter5/sets1.als", "models/book/chapter5/sets2.als",
-           "models/book/chapter6/hotel.thm", "models/book/chapter6/hotel1.als", "models/book/chapter6/hotel2.als",
-           "models/book/chapter6/hotel3.als", "models/book/chapter6/hotel4.als", "models/book/chapter6/mediaAssets.als",
-           "models/book/chapter6/memory/abstractMemory.als", "models/book/chapter6/memory/cacheMemory.als",
-           "models/book/chapter6/memory/checkCache.als", "models/book/chapter6/memory/checkFixedSize.als",
-           "models/book/chapter6/memory/fixedSizeMemory.als", "models/book/chapter6/memory/fixedSizeMemory_H.als",
-           "models/book/chapter6/ringElection.thm", "models/book/chapter6/ringElection1.als", "models/book/chapter6/ringElection2.als",
-           "models/examples/algorithms/dijkstra.als", "models/examples/algorithms/dijkstra.thm",
-           "models/examples/algorithms/messaging.als", "models/examples/algorithms/messaging.thm",
-           "models/examples/algorithms/opt_spantree.als", "models/examples/algorithms/opt_spantree.thm",
-           "models/examples/algorithms/peterson.als",
-           "models/examples/algorithms/ringlead.als", "models/examples/algorithms/ringlead.thm",
-           "models/examples/algorithms/s_ringlead.als",
-           "models/examples/algorithms/stable_mutex_ring.als", "models/examples/algorithms/stable_mutex_ring.thm",
-           "models/examples/algorithms/stable_orient_ring.als", "models/examples/algorithms/stable_orient_ring.thm",
-           "models/examples/algorithms/stable_ringlead.als", "models/examples/algorithms/stable_ringlead.thm",
-           "models/examples/case_studies/INSLabel.als", "models/examples/case_studies/chord.als",
-           "models/examples/case_studies/chord2.als", "models/examples/case_studies/chordbugmodel.als",
-           "models/examples/case_studies/com.als", "models/examples/case_studies/firewire.als", "models/examples/case_studies/firewire.thm",
-           "models/examples/case_studies/ins.als", "models/examples/case_studies/iolus.als",
-           "models/examples/case_studies/sync.als", "models/examples/case_studies/syncimpl.als",
-           "models/examples/puzzles/farmer.als", "models/examples/puzzles/farmer.thm",
-           "models/examples/puzzles/handshake.als", "models/examples/puzzles/handshake.thm",
-           "models/examples/puzzles/hanoi.als", "models/examples/puzzles/hanoi.thm",
-           "models/examples/systems/file_system.als", "models/examples/systems/file_system.thm",
-           "models/examples/systems/javatypes_soundness.als",
-           "models/examples/systems/lists.als", "models/examples/systems/lists.thm",
-           "models/examples/systems/marksweepgc.als", "models/examples/systems/views.als",
-           "models/examples/toys/birthday.als", "models/examples/toys/birthday.thm",
-           "models/examples/toys/ceilingsAndFloors.als", "models/examples/toys/ceilingsAndFloors.thm",
-           "models/examples/toys/genealogy.als", "models/examples/toys/genealogy.thm",
-           "models/examples/toys/grandpa.als", "models/examples/toys/grandpa.thm",
-           "models/examples/toys/javatypes.als", "models/examples/toys/life.als", "models/examples/toys/life.thm",
-           "models/examples/toys/numbering.als", "models/examples/toys/railway.als", "models/examples/toys/railway.thm",
-           "models/examples/toys/trivial.als",
-           "models/examples/tutorial/farmer.als",
-           "models/util/boolean.als", "models/util/graph.als", "models/util/integer.als", "models/util/natural.als",
-           "models/util/ordering.als", "models/util/relation.als", "models/util/seqrel.als", "models/util/sequence.als",
-           "models/util/sequniv.als", "models/util/ternary.als", "models/util/time.als"
-           );
+//        Util.copy(false, true, alloyHome(),
+//           "models/book/appendixA/addressBook1.als", "models/book/appendixA/addressBook2.als", "models/book/appendixA/barbers.als",
+//           "models/book/appendixA/closure.als", "models/book/appendixA/distribution.als", "models/book/appendixA/phones.als",
+//           "models/book/appendixA/prison.als", "models/book/appendixA/properties.als", "models/book/appendixA/ring.als",
+//           "models/book/appendixA/spanning.als", "models/book/appendixA/tree.als", "models/book/appendixA/tube.als", "models/book/appendixA/undirected.als",
+//           "models/book/appendixE/hotel.thm", "models/book/appendixE/p300-hotel.als", "models/book/appendixE/p303-hotel.als", "models/book/appendixE/p306-hotel.als",
+//           "models/book/chapter2/addressBook1a.als", "models/book/chapter2/addressBook1b.als", "models/book/chapter2/addressBook1c.als",
+//           "models/book/chapter2/addressBook1d.als", "models/book/chapter2/addressBook1e.als", "models/book/chapter2/addressBook1f.als",
+//           "models/book/chapter2/addressBook1g.als", "models/book/chapter2/addressBook1h.als", "models/book/chapter2/addressBook2a.als",
+//           "models/book/chapter2/addressBook2b.als", "models/book/chapter2/addressBook2c.als", "models/book/chapter2/addressBook2d.als",
+//           "models/book/chapter2/addressBook2e.als", "models/book/chapter2/addressBook3a.als", "models/book/chapter2/addressBook3b.als",
+//           "models/book/chapter2/addressBook3c.als", "models/book/chapter2/addressBook3d.als", "models/book/chapter2/theme.thm",
+//           "models/book/chapter4/filesystem.als", "models/book/chapter4/grandpa1.als",
+//           "models/book/chapter4/grandpa2.als", "models/book/chapter4/grandpa3.als", "models/book/chapter4/lights.als",
+//           "models/book/chapter5/addressBook.als", "models/book/chapter5/lists.als", "models/book/chapter5/sets1.als", "models/book/chapter5/sets2.als",
+//           "models/book/chapter6/hotel.thm", "models/book/chapter6/hotel1.als", "models/book/chapter6/hotel2.als",
+//           "models/book/chapter6/hotel3.als", "models/book/chapter6/hotel4.als", "models/book/chapter6/mediaAssets.als",
+//           "models/book/chapter6/memory/abstractMemory.als", "models/book/chapter6/memory/cacheMemory.als",
+//           "models/book/chapter6/memory/checkCache.als", "models/book/chapter6/memory/checkFixedSize.als",
+//           "models/book/chapter6/memory/fixedSizeMemory.als", "models/book/chapter6/memory/fixedSizeMemory_H.als",
+//           "models/book/chapter6/ringElection.thm", "models/book/chapter6/ringElection1.als", "models/book/chapter6/ringElection2.als",
+//           "models/examples/algorithms/dijkstra.als", "models/examples/algorithms/dijkstra.thm",
+//           "models/examples/algorithms/messaging.als", "models/examples/algorithms/messaging.thm",
+//           "models/examples/algorithms/opt_spantree.als", "models/examples/algorithms/opt_spantree.thm",
+//           "models/examples/algorithms/peterson.als",
+//           "models/examples/algorithms/ringlead.als", "models/examples/algorithms/ringlead.thm",
+//           "models/examples/algorithms/s_ringlead.als",
+//           "models/examples/algorithms/stable_mutex_ring.als", "models/examples/algorithms/stable_mutex_ring.thm",
+//           "models/examples/algorithms/stable_orient_ring.als", "models/examples/algorithms/stable_orient_ring.thm",
+//           "models/examples/algorithms/stable_ringlead.als", "models/examples/algorithms/stable_ringlead.thm",
+//           "models/examples/case_studies/INSLabel.als", "models/examples/case_studies/chord.als",
+//           "models/examples/case_studies/chord2.als", "models/examples/case_studies/chordbugmodel.als",
+//           "models/examples/case_studies/com.als", "models/examples/case_studies/firewire.als", "models/examples/case_studies/firewire.thm",
+//           "models/examples/case_studies/ins.als", "models/examples/case_studies/iolus.als",
+//           "models/examples/case_studies/sync.als", "models/examples/case_studies/syncimpl.als",
+//           "models/examples/puzzles/farmer.als", "models/examples/puzzles/farmer.thm",
+//           "models/examples/puzzles/handshake.als", "models/examples/puzzles/handshake.thm",
+//           "models/examples/puzzles/hanoi.als", "models/examples/puzzles/hanoi.thm",
+//           "models/examples/systems/file_system.als", "models/examples/systems/file_system.thm",
+//           "models/examples/systems/javatypes_soundness.als",
+//           "models/examples/systems/lists.als", "models/examples/systems/lists.thm",
+//           "models/examples/systems/marksweepgc.als", "models/examples/systems/views.als",
+//           "models/examples/toys/birthday.als", "models/examples/toys/birthday.thm",
+//           "models/examples/toys/ceilingsAndFloors.als", "models/examples/toys/ceilingsAndFloors.thm",
+//           "models/examples/toys/genealogy.als", "models/examples/toys/genealogy.thm",
+//           "models/examples/toys/grandpa.als", "models/examples/toys/grandpa.thm",
+//           "models/examples/toys/javatypes.als", "models/examples/toys/life.als", "models/examples/toys/life.thm",
+//           "models/examples/toys/numbering.als", "models/examples/toys/railway.als", "models/examples/toys/railway.thm",
+//           "models/examples/toys/trivial.als",
+//           "models/examples/tutorial/farmer.als",
+//           "models/util/boolean.als", "models/util/graph.als", "models/util/integer.als", "models/util/natural.als",
+//           "models/util/ordering.als", "models/util/relation.als", "models/util/seqrel.als", "models/util/sequence.als",
+//           "models/util/sequniv.als", "models/util/ternary.als", "models/util/time.als"
+//           );
+        try {
+            Util.copy(false, true, alloyHome(), Util.readAll(Util.jarPrefix() + "models/__all__.txt").split("\\n"));
+        } catch (IOException e) { e.printStackTrace(); }
         // Record the locations
         System.setProperty("alloy.theme0", alloyHome() + fs + "models");
         System.setProperty("alloy.home", alloyHome());
@@ -727,6 +811,11 @@ public final class SimpleGUI implements ComponentListener, Listener {
             menuItem(editmenu, "Find...",   'F', 'F', doFind());
             menuItem(editmenu, "Find Next", 'G', 'G', doFindNext());
             editmenu.addSeparator();
+            menuItem(editmenu, "Comment Region",  CTRL_MASK,  '/', doCommentRegion());
+            menuItem(editmenu, "Uncomment Region", CTRL_MASK, '\\', doUncommentRegion());
+            menuItem(editmenu, "Indent Region", doIndentRegion());
+            menuItem(editmenu, "Unindent Region", doUnindentRegion());
+            editmenu.addSeparator();
             if (!Util.onMac()) menuItem(editmenu, "Preferences", 'P', 'P', doPreferences());
         } finally {
             wrap = false;
@@ -749,6 +838,26 @@ public final class SimpleGUI implements ComponentListener, Listener {
     /** This method performs Edit->Copy. */
     private Runner doCopy() {
         if (!wrap) { if (lastFocusIsOnEditor) text.get().copy(); else log.copy(); }
+        return wrapMe();
+    }
+
+    private Runner doCommentRegion() {
+        if (!wrap) { if (lastFocusIsOnEditor) text.get().doCommentRegion(); }
+        return wrapMe();
+    }
+
+    private Runner doUncommentRegion() {
+        if (!wrap) { if (lastFocusIsOnEditor) text.get().uncommentRegion(); }
+        return wrapMe();
+    }
+
+    private Runner doIndentRegion() {
+        if (!wrap) { if (lastFocusIsOnEditor) text.get().doIndentRegion(); }
+        return wrapMe();
+    }
+
+    private Runner doUnindentRegion() {
+        if (!wrap) { if (lastFocusIsOnEditor) text.get().doUnindentRegion(); }
         return wrapMe();
     }
 
@@ -787,17 +896,12 @@ public final class SimpleGUI implements ComponentListener, Listener {
         if (wrap) return wrapMe();
         if (lastFind.length()==0) return null;
         OurSyntaxWidget t = text.get();
-        String all = t.getText();
-        int i = Util.indexOf(all, lastFind, t.getCaret()+(lastFindForward?0:-1),lastFindForward,lastFindCaseSensitive);
-        if (i<0) {
-            i=Util.indexOf(all, lastFind, lastFindForward?0:(all.length()-1), lastFindForward, lastFindCaseSensitive);
-            if (i<0) { log.logRed("The specified search string cannot be found."); return null; }
-            log.logRed("Search wrapped.");
-        } else {
-            log.clearError();
-        }
-        if (lastFindForward) t.moveCaret(i, i+lastFind.length()); else t.moveCaret(i+lastFind.length(), i);
-        t.requestFocusInWindow();
+
+        int i = t.search(lastFind, lastFindCaseSensitive, lastFindForward);
+        if (i<0)        log.logRed("The specified search string cannot be found.");
+        else if (i > 0) log.logRed("Search wrapped.");
+        else            log.clearError();
+
         return null;
     }
 
@@ -883,34 +987,11 @@ public final class SimpleGUI implements ComponentListener, Listener {
         } finally {
             wrap = false;
         }
-        List<Command> cp = commands;
-        if (cp==null) {
-            try {
-                cp=CompUtil.parseOneModule_fromString(text.get().getText());
-            }
-            catch(Err e) {
-                commands = null;
-                runmenu.getItem(0).setEnabled(false);
-                runmenu.getItem(3).setEnabled(false);
-                text.shade(new Pos(text.get().getFilename(), e.pos.x, e.pos.y, e.pos.x2, e.pos.y2));
-                if ("yes".equals(System.getProperty("debug")) && VerbosityPref.get()==Verbosity.FULLDEBUG)
-                    log.logRed("Fatal Exception!" + e.dump() + "\n\n");
-                else
-                    log.logRed(e.toString()+"\n\n");
-                return null;
-            }
-            catch(Throwable e) {
-                commands = null;
-                runmenu.getItem(0).setEnabled(false);
-                runmenu.getItem(3).setEnabled(false);
-                log.logRed("Cannot parse the model.\n"+e.toString()+"\n\n");
-                return null;
-            }
-            commands=cp;
-        }
+        List<Command> cp = refreshCommands();
+        if (cp == null) { runmenu.getItem(0).setEnabled(false); runmenu.getItem(3).setEnabled(false); return null; }
+
         text.clearShade();
         log.clearError(); // To clear any residual error message
-        if (cp==null) { runmenu.getItem(0).setEnabled(false); runmenu.getItem(3).setEnabled(false); return null; }
         if (cp.size()==0) { runmenu.getItem(0).setEnabled(false); return null; }
         if (latestCommand>=cp.size()) latestCommand=cp.size()-1;
         runmenu.remove(0);
@@ -933,6 +1014,33 @@ public final class SimpleGUI implements ComponentListener, Listener {
             wrap = false;
         }
         return null;
+    }
+
+    private List<Command> refreshCommands() {
+        List<Command> cp = commands;
+        try {
+            cp=CompUtil.parseOneModule_fromString(text.get().getText());
+            commands=cp;
+            return cp;
+        }
+        catch(Err e) {
+            commands = null;
+            runmenu.getItem(0).setEnabled(false);
+            runmenu.getItem(3).setEnabled(false);
+            text.shade(new Pos(text.get().getFilename(), e.pos.x, e.pos.y, e.pos.x2, e.pos.y2));
+            if (Util.isDebug() && VerbosityPref.get().geq(Verbosity.FULLDEBUG))
+                log.logRed("Fatal Exception!" + e.dump() + "\n\n");
+            else
+                log.logRed(e.toString()+"\n\n");
+            return null;
+        }
+        catch(Throwable e) {
+            commands = null;
+            runmenu.getItem(0).setEnabled(false);
+            runmenu.getItem(3).setEnabled(false);
+            log.logRed("Cannot parse the model.\n"+e.toString()+"\n\n");
+            return null;
+        }
     }
 
     /** This method executes a particular RUN or CHECK command. */
@@ -963,11 +1071,15 @@ public final class SimpleGUI implements ComponentListener, Listener {
         opt.noOverflow = NoOverflow.get();
         opt.unrolls = Version.experimental ? Unrolls.get() : (-1);
         opt.skolemDepth = SkolemDepth.get();
+        opt.higherOrderSolver = UseHOLSolver.get();
+        opt.holMaxIter = A4Preferences.HOLMaxIter.get();
+        opt.holFullIncrements = !A4Preferences.HOLForceIncInd.get();
         opt.coreMinimization = CoreMinimization.get();
-        opt.inferPartialInstance = InferPartialInstance.get();
         opt.coreGranularity = CoreGranularity.get();
         opt.originalFilename = Util.canon(text.get().getFilename());
         opt.solver = Solver.get();
+        opt.solverThreads = SolverThreads.get();
+        opt.solverThreadsShareClauses = SolverThreadsShareClauses.get();
         task.bundleIndex = i;
         task.bundleWarningNonFatal = WarningNonfatal.get();
         task.map = text.takeSnapshot();
@@ -981,7 +1093,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
             stopbutton.setVisible(true);
             int newmem = SubMemory.get(), newstack = SubStack.get();
             if (newmem != subMemoryNow || newstack != subStackNow) WorkerEngine.stop();
-            if ("yes".equals(System.getProperty("debug")) && VerbosityPref.get()==Verbosity.FULLDEBUG)
+            if (Util.isDebug() && VerbosityPref.get().geq(Verbosity.FULLDEBUG))
                 WorkerEngine.runLocally(task, cb);
             else
                 WorkerEngine.run(task, newmem, newstack, alloyHome() + fs + "binary", "", cb);
@@ -1157,10 +1269,12 @@ public final class SimpleGUI implements ComponentListener, Listener {
 
             optmenu.addSeparator();
 
-            addToMenu(optmenu, SyntaxDisabled);
-            addToMenu(optmenu, FontSize);
+            addToMenu(optmenu, SyntaxDisabled, KeyBindings, FontSize);
+
             menuItem(optmenu, "Font: "+FontName.get()+"...", doOptFontname());
+
             addToMenu(optmenu, TabSize);
+            addToMenu(optmenu, A4Preferences.UseSpacesForTabs);
             if (Util.onMac() || Util.onWindows())
                menuItem(optmenu, "Use anti-aliasing: Yes", false);
             else
@@ -1170,9 +1284,11 @@ public final class SimpleGUI implements ComponentListener, Listener {
             optmenu.addSeparator();
 
             addToMenu(optmenu, Solver);
-            addToMenu(optmenu, SkolemDepth);
-            JMenu cmMenu = addToMenu(optmenu, CoreMinimization); cmMenu.setEnabled(Solver.get() == SatSolver.MiniSatProverJNI);
-            JMenu cgMenu = addToMenu(optmenu, CoreGranularity); cgMenu.setEnabled(Solver.get() == SatSolver.MiniSatProverJNI);
+            addToMenu(optmenu, Solver.get().isParellel(), SolverThreads);
+            addToMenu(optmenu, Solver.get().isParellel(), SolverThreadsShareClauses);
+            addToMenu(optmenu, !UseHOLSolver.get(), SkolemDepth);
+            JMenuItem cmMenu = addToMenu(optmenu, CoreMinimization); cmMenu.setEnabled(Solver.get() == SatSolver.MiniSatProverJNI);
+            JMenuItem cgMenu = addToMenu(optmenu, CoreGranularity); cgMenu.setEnabled(Solver.get() == SatSolver.MiniSatProverJNI);
 
             addToMenu(optmenu, AutoVisualize, RecordKodkod);
 
@@ -1181,12 +1297,17 @@ public final class SimpleGUI implements ComponentListener, Listener {
               addToMenu(optmenu, ImplicitThis, NoOverflow, InferPartialInstance);
             }
 
+            optmenu.addSeparator();
+            addToMenu(optmenu, UseHOLSolver);
+            addToMenu(optmenu, UseHOLSolver.get(), HOLForceIncInd, HOLMaxIter,
+                    HOLSaveCandidates, HOLSaveCex, HOLSaveFormulas, HOLSavePI);
         } finally {
             wrap = false;
         }
         return null;
     }
-    
+
+    /** This method changes the font name. */
     private Runner doOptFontname() {
         if (wrap) return wrapMe();
         int size=FontSize.get();
@@ -1210,6 +1331,15 @@ public final class SimpleGUI implements ComponentListener, Listener {
        log.setFontSize(n);
        viz.doSetFontSize(n);
        return null;
+    }
+
+    private void incFontSize(int inc) {
+        int fontSize = FontSize.get();
+        int newSize = fontSize + inc;
+        if (newSize > 0) {
+            FontSize.set(newSize);
+            doOptRefreshFont();
+        }
     }
 
     /** This method toggles the "antialias" checkbox. */
@@ -1299,6 +1429,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
         try { alloytxt = Util.readAll(JAR + "LICENSES" + File.separator + "Alloy.txt"); } catch(IOException ex) { return null; }
         final JTextArea text = OurUtil.textarea(alloytxt, 15, 85, false, false, new EmptyBorder(2, 2, 2, 2), new Font("Monospaced", Font.PLAIN, 12));
         final JScrollPane scroll = OurUtil.scrollpane(text, new LineBorder(Color.DARK_GRAY, 1));
+        @SuppressWarnings("rawtypes")
         final JComboBox combo = new OurCombobox(new String[]{"Alloy","Kodkod","JavaCup","SAT4J","ZChaff","MiniSat"}) {
             private static final long serialVersionUID = 0;
             @Override public void do_changed(Object value) {
@@ -1382,6 +1513,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
             if (f.length()>0 && f.charAt(0)==' ') f=f.substring(1); // Get rid of the space after Y2
             Pos p=new Pos(Util.canon(f), x1, y1, x2, y2);
             text.shade(p);
+            s.close();
         }
         if (arg.startsWith("CNF: ")) { // CNF: filename
             String filename=Util.canon(arg.substring(5));
@@ -1417,7 +1549,10 @@ public final class SimpleGUI implements ComponentListener, Listener {
             SimpleTask2 task = new SimpleTask2();
             task.filename = arg;
             try {
-                WorkerEngine.run(task, SubMemory.get(), SubStack.get(), alloyHome() + fs + "binary", "", cb);
+                if (Util.isDebug() && VerbosityPref.get().geq(Verbosity.FULLDEBUG))
+                    WorkerEngine.runLocally(task, cb);
+                else
+                    WorkerEngine.run(task, SubMemory.get(), SubStack.get(), alloyHome() + fs + "binary", "", cb);
 //                task.run(cb);
             } catch(Throwable ex) {
                 WorkerEngine.stop();
@@ -1454,17 +1589,17 @@ public final class SimpleGUI implements ComponentListener, Listener {
         return SimTupleset.make(list);
     }
 
-    /** Converts an A4Solution into a SimInstance object. */
-    private static SimInstance convert(Module root, A4Solution ans) throws Err {
-       SimInstance ct = new SimInstance(root, ans.getBitwidth(), ans.getMaxSeq());
-        for(Sig s: ans.getAllReachableSigs()) {
-            if (!s.builtin) ct.init(s, convert(ans.eval(s)));
-            for(Field f: s.getFields())  if (!f.defined)  ct.init(f, convert(ans.eval(f)));
-        }
-        for(ExprVar a:ans.getAllAtoms())   ct.init(a, convert(ans.eval(a)));
-        for(ExprVar a:ans.getAllSkolems()) ct.init(a, convert(ans.eval(a)));
-        return ct;
-    }
+//    /** Converts an A4Solution into a SimInstance object. */
+//    private static SimInstance convert(Module root, A4Solution ans) throws Err {
+//       SimInstance ct = new SimInstance(root, ans.getBitwidth(), ans.getMaxSeq());
+//        for(Sig s: ans.getAllReachableSigs()) {
+//            if (!s.builtin) ct.init(s, convert(ans.eval(s)));
+//            for(Field f: s.getFields())  if (!f.defined)  ct.init(f, convert(ans.eval(f)));
+//        }
+//        for(ExprVar a:ans.getAllAtoms())   ct.init(a, convert(ans.eval(a)));
+//        for(ExprVar a:ans.getAllSkolems()) ct.init(a, convert(ans.eval(a)));
+//        return ct;
+//    }
 
     /** This object performs expression evaluation. */
     private static Computer evaluator = new Computer() {
@@ -1500,11 +1635,12 @@ public final class SimpleGUI implements ComponentListener, Listener {
             }
             try {
                 Expr e = CompUtil.parseOneExpression_fromString(root, str);
-                if ("yes".equals(System.getProperty("debug")) && VerbosityPref.get()==Verbosity.FULLDEBUG) {
-                    SimInstance simInst = convert(root, ans);
-                    return simInst.visitThis(e).toString() + (simInst.wasOverflow() ? " (OF)" : "");
-                } else
-                   return ans.eval(e).toString();
+                return ans.eval(e).toString();
+//                if (Util.isDebug() && VerbosityPref.get().geq(Verbosity.FULLDEBUG)) {
+//                    SimInstance simInst = convert(root, ans);
+//                    return simInst.visitThis(e).toString() + (simInst.wasOverflow() ? " (OF)" : "");
+//                } else
+//                   return ans.eval(e).toString();
             } catch(HigherOrderDeclException ex) {
                 throw new ErrorType("Higher-order quantification is not allowed in the evaluator.");
             }
@@ -1513,10 +1649,13 @@ public final class SimpleGUI implements ComponentListener, Listener {
 
     //====== Main Method ====================================================//
 
+    private static SimpleGUI instance;
+    public static SimpleGUI instance() { return instance; }
+
     /** Main method that launches the program; this method might be called by an arbitrary thread. */
     public static void main(final String[] args) throws Exception {
         SwingUtilities.invokeLater(new Runnable() {
-            public void run() { new SimpleGUI(args); }
+            public void run() { SimpleGUI.instance = new SimpleGUI(args); }
         });
     }
 
@@ -1553,6 +1692,9 @@ public final class SimpleGUI implements ComponentListener, Listener {
         }
 
         doLookAndFeel();
+
+        // add global key dispatcher
+        setGlobalKeyDispatcher();
 
         // Figure out the desired x, y, width, and height
         int screenWidth=OurUtil.getScreenWidth(), screenHeight=OurUtil.getScreenHeight();
@@ -1614,11 +1756,11 @@ public final class SimpleGUI implements ComponentListener, Listener {
 //        c.callback(null);
 
         SimpleGUI.this.frame = frame;
+        SimpleGUI.this.keyCombo = new ArrayList<KeyEvent>();
         finishInit(args, windowWidth);
     }
 
     private void finishInit(String[] args, int width) {
-
         // Add the listeners
         try {
             wrap = true;
@@ -1792,7 +1934,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
         text.get().requestFocusInWindow();
 
         // Launch the welcome screen if needed
-        if (!"yes".equals(System.getProperty("debug")) && Welcome.get()) {
+        if (!Util.isDebug() && Welcome.get()) {
            JCheckBox again = new JCheckBox("Show this message every time you start the Alloy Analyzer");
            again.setSelected(true);
            OurDialog.showmsg("Welcome",
@@ -1839,11 +1981,483 @@ public final class SimpleGUI implements ComponentListener, Listener {
         t.start();
     }
 
+    /* ===================================================================================================================== */
+    /* Keyboard manager for Emacs mode */
+    /* ===================================================================================================================== */
+
+    /** current key combo */
+    private List<KeyEvent> keyCombo;
+    private String currentCommand;
+    private String consumed = null;
+
+    enum SearchKind {
+        FORWARD("I-Search"), BACKWARD("I-Search"), BUFFER("Buffer"), COMMAND("Run Command"), RECENT("Open Recent"), FILE_OPEN("Find File"),
+        EXPAND_WORD("Expand-Word");
+
+        final String label;
+        private SearchKind(String label) { this.label = label; }
+        public String label() { return label; }
+    };
+
+    /** current and old search buffer */
+    private String oldSearchQuery = "", searchQuery = "";
+    private String currSearchStatus = null;
+    private List<String> searchPreQueries = new LinkedList<String>();
+    private String searchPreQueriesSep = File.separator;
+    /** current search */
+    private SearchKind searchKind = null;
+    /** search start index */
+    private int searchStartIndex = 0;
+    /** outcome of the last search: -1 - failed; 0: succeeded; 1 - wrapped */
+    private int searchOutcome = 0;
+    /** keys: suggestions by the system (e.g., like auto completion); values: context-specific mapping */
+    private LinkedHashMap<String, Object> currSearchSuggestions = null;
+    private LinkedHashMap<String, Object> allSearchSuggestions = null;
+    private List<Pair<String, String>> currBuffers = null;
+    private int currBufferIdx = -1;
+    private Pattern currPattern = null;
+    private Matcher currMatcher = null;
+    private Set<String> currExpansionHistory = null;
+
+    public boolean inSearchMode()      { return searchKind != null; }
+    public int searchOutcome()         { return searchOutcome; }
+    public boolean searchingForward()  { return inSearchMode() && searchKind == SearchKind.FORWARD; }
+    public boolean searchingBackward() { return inSearchMode() && searchKind == SearchKind.BACKWARD; }
+    public boolean searchingBuffer()   { return inSearchMode() && searchKind == SearchKind.BUFFER; }
+    public boolean searchingCommand()  { return inSearchMode() && searchKind == SearchKind.COMMAND; }
+    public boolean searchingFile()     { return inSearchMode() && searchKind == SearchKind.FILE_OPEN; }
+    public boolean expandingWord()     { return inSearchMode() && searchKind == SearchKind.EXPAND_WORD; }
+    public String searchQuery()        { return inSearchMode() ? searchQuery : ""; }
+    public String searchPreQuery()     { return inSearchMode() ? Util.join(searchPreQueries, searchPreQueriesSep, false, searchPreQueries.size() > 0) : ""; }
+    public String fullSearchQuery()    { return inSearchMode() ? searchPreQuery() + searchQuery() : ""; }
+
+    private List<Pair<String, String>> orderBuffers() {
+        List<Pair<String, String>> ans = new ArrayList<Pair<String, String>>(text.count());
+        OurSyntaxWidget currBuff = text.get();
+        ans.add(new Pair<String, String>(currBuff.getFilename(), currBuff.getText()));
+        for (int i = 0; i < text.count(); i++) {
+            if (i != text.selected()) {
+                OurSyntaxWidget b = text.get(i);
+                ans.add(new Pair<String, String>(b.getFilename(), b.getText()));
+            }
+        }
+        return ans;
+    }
+
+    private void rotateCurrSearchSuggestion(boolean left) {
+        if (currSearchSuggestions == null) return;
+        if (currSearchSuggestions.size() < 2) return;
+        int leftRotNum = left ? 1 : currSearchSuggestions.size() - 1;
+        for (int i = 0; i < leftRotNum; i++) {
+            String key = currSearchSuggestions.keySet().iterator().next();
+            Object val = currSearchSuggestions.remove(key);
+            currSearchSuggestions.put(key, val);
+        }
+    }
+
+    private void filterSearchSuggestions() {
+        if (currSearchSuggestions == null) return;
+        LinkedHashMap<String, Object> newSS = new LinkedHashMap<String, Object>(currSearchSuggestions);
+        for (String ss : currSearchSuggestions.keySet())
+            if (!ss.startsWith(searchQuery))
+                newSS.remove(ss);
+        if (newSS.size() == 0) {
+            newSS = new LinkedHashMap<String, Object>(currSearchSuggestions);
+            for (String ss : currSearchSuggestions.keySet())
+                if (ss.indexOf(searchQuery) == -1)
+                    newSS.remove(ss);
+        }
+        currSearchSuggestions = newSS;
+    }
+
+    private void resetSearch()               { resetSearch(false); }
+    private void resetSearch(boolean cancel) {
+        if (searchKind == null) return;
+        if (cancel && searchStartIndex >= 0 && searchStartIndex < text.get().getText().length())
+            text.get().setCaretPosition(searchStartIndex);
+        searchKind = null;
+        if (searchQuery.length() > 0) oldSearchQuery = searchQuery;
+        searchQuery = "";
+        searchPreQueries.clear();
+        searchStartIndex = -1;
+        searchOutcome = 0;
+        currSearchSuggestions = null;
+        currSearchStatus = null;
+        allSearchSuggestions = null;
+
+        currPattern = null;
+        currMatcher = null;
+        currBufferIdx = -1;
+        currBuffers = null;
+        currExpansionHistory = null;
+
+        notifyChange();
+    }
+
+    private void setGlobalKeyDispatcher() {
+        if (!"Emacs".equals(KeyBindings.get())) return;
+
+        final KeyboardFocusManager dp = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        dp.addKeyEventDispatcher(new KeyEventDispatcher() {
+            public boolean dispatchKeyEvent(KeyEvent e) {
+                if (!e.getSource().getClass().getName().startsWith("edu.mit.csail.sdg.alloy")) return false;
+                try {
+                    switch (e.getID()) {
+                        case KeyEvent.KEY_PRESSED: return keyPressed(e);
+                        case KeyEvent.KEY_RELEASED: return keyReleased(e);
+                        case KeyEvent.KEY_TYPED: return keyTyped(e);
+                        default: return false;
+                    }
+                } finally {
+                    notifyChange();
+                }
+            }
+
+            private boolean isConsumed(KeyEvent e) {
+                return printKeyEvent(e).equals(consumed);
+            }
+            private void _finishSearch() {
+                boolean finished = emacsDoFinishSearch();
+                if (finished) resetSearch();
+                notifyChange();
+            }
+            private boolean searchModeKeyPressed(KeyEvent e) {
+                if (expandingWord() && !"M-/".equals(printKeyEvent(e))) {
+                    _finishSearch();
+                    return true;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_BACK_SPACE && allSearchSuggestions != null) {
+                    if (searchQuery.length() > 0) {
+                        searchQuery = searchQuery.substring(0, searchQuery().length() - 1);
+                        currSearchSuggestions = new LinkedHashMap<String, Object>(allSearchSuggestions);
+                        emacsDoSearch();
+                        return true;
+                    } else if (searchPreQueries.size() > 0) {
+                        searchPreQueries.remove(searchPreQueries.size() - 1);
+                        updateFolderFiles();
+                        return true;
+                    }
+                } else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    _finishSearch();
+                    return true;
+                } else if ((e.getKeyCode() == KeyEvent.VK_LEFT || e.getKeyCode() == KeyEvent.VK_RIGHT) && currSearchSuggestions != null) {
+                    rotateCurrSearchSuggestion(e.getKeyCode() == KeyEvent.VK_RIGHT);
+                    return true;
+                } else if (e.getKeyCode() == KeyEvent.VK_TAB && currSearchSuggestions != null) {
+                    if (currSearchSuggestions.size() == 1) {
+                        _finishSearch();
+                    } else {
+                        rotateCurrSearchSuggestion((e.getModifiers() & KeyEvent.SHIFT_MASK) == 0);
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            private boolean searchModeKeyTyped(KeyEvent e) {
+                int keyCharInt = (int)e.getKeyChar();
+                if (keyCharInt > 31) {
+                    searchQuery += e.getKeyChar();
+                    emacsDoSearch();
+                    return true;
+                }
+                return false;
+            }
+
+            private boolean searchModeKeyReleased(KeyEvent e) { return false; }
+
+            private boolean keyReleased(KeyEvent e) {
+                if (isConsumed(e)) return consume(e);
+                if (inSearchMode()) if (searchModeKeyReleased(e)) return consume(e);
+                return false;
+            }
+
+            private boolean keyTyped(KeyEvent e) {
+                if (isConsumed(e)) return consume(e);
+                if (inSearchMode()) if (searchModeKeyTyped(e)) return consume(e);
+                return false;
+            }
+
+            private boolean keyPressed(KeyEvent e) {
+                consumed = null;
+                currentCommand = null;
+                if (inSearchMode()) if (searchModeKeyPressed(e)) return consume(e);
+
+                if (isKey(e, "C-g")) {
+                    updateStatus(e, "Quit Command", false);
+                    clearCombo(false);
+                    searchQuery = "";
+                    resetSearch(true);
+                    return false;
+                }
+
+                if (isComboKey(e, "C-x"))     { keyCombo.add(e); return consume(e); }
+                if (isComboKey(e, "C-x C-f")) { updateStatus(e, "File Open");     emacsFileOpen();  clearCombo(true); return consume(e); }
+//                if (isComboKey(e, "C-x C-f")) { updateStatus(e, "File Open");     doOpen();    clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x C-s")) { updateStatus(e, "File Save");     doSave();    clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x C-w")) { updateStatus(e, "File Save As");  doSaveAs();  clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x C-c")) { updateStatus(e, "Quit");          doQuit();    clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x k"))   { updateStatus(e, "File Close");    doClose();   clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x b"))   { updateStatus(e, "Buffer Switch"); emacsInitBufferSwitch(); clearCombo(true);  return consume(e); }
+                if (isComboKey(e, "C-x n"))   { updateStatus(e, "New File");      doNew();     clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C-x C-r")) { updateStatus(e, "Open Recent");   emacsInitOpenRecent();   clearCombo(true); return consume(e); }
+
+                if (isComboKey(e, "C-c"))     { keyCombo.add(e); return consume(e); }
+                if (isComboKey(e, "C-c C-c")) { updateStatus(e, "Execute Command"); emacsInitExeCommand(); clearCombo(true); return consume(e); }
+
+                if (isComboKey(e, "C-s")) { updateStatus(e, "I-Search");          emacsInitSearch(true);  clearCombo(true); return consume(e); }
+                if (isComboKey(e, "C-r")) { updateStatus(e, "I-Search backward"); emacsInitSearch(false); clearCombo(true); return consume(e); }
+
+                if (isComboKey(e, "C-+")) { updateStatus(e, "Increase Font Size"); incFontSize(+1); clearCombo(false); return consume(e); }
+                if (isComboKey(e, "C--")) { updateStatus(e, "Decrease Font Size"); incFontSize(-1); clearCombo(false); return consume(e); }
+
+                if (isComboKey(e, "M-`")) { updateStatus(e, "Menu bar"); filemenu.doClick(); clearCombo(false); return consume(e); }
+                if (isComboKey(e, "M-/")) { updateStatus(e, "Expanding..."); emacsInitExpandWord(); clearCombo(true); return consume(e); }
+
+                if (e.getKeyChar() != KeyEvent.CHAR_UNDEFINED && keyCombo.size() > 0) {
+                    currentCommand = "unbound: " + printKeyCombos() + " " + printKeyEvent(e);
+                    clearCombo(false);
+                    consume(e);
+                    return true;
+                }
+
+                clearCombo(true);
+                return false;
+            }
+            protected void emacsInitSearch(boolean fwd) {
+                searchStartIndex = text.get().getCaretPosition();
+                SearchKind newSearchKind = fwd ? SearchKind.FORWARD : SearchKind.BACKWARD;
+                if (searchKind == newSearchKind && searchQuery.length() == 0)
+                    searchQuery = oldSearchQuery;
+                searchKind = newSearchKind;
+                if (searchQuery.length() > 0)
+                    emacsDoTextSearch();
+            }
+            protected void emacsInitExpandWord() {
+                if (searchKind == null) {
+                    currBuffers = orderBuffers();
+                    currExpansionHistory = new HashSet<String>();
+                    currBufferIdx = -1;
+                    String prefix = text.get().getTrailingWord();
+                    if (prefix.length() == 0) {
+                        emacsDoFinishSearch();
+                        return;
+                    }
+                    currPattern = Pattern.compile(prefix + "\\w+\\b");
+                    searchQuery = "'" + prefix + "'";
+                }
+                searchKind = SearchKind.EXPAND_WORD;
+                emacsDoExpandWord();
+            }
+            protected void emacsInitBufferSwitch() {
+                if (searchKind == null) {
+                    allSearchSuggestions = new LinkedHashMap<String, Object>();
+                    currSearchSuggestions = new LinkedHashMap<String, Object>();
+                    boolean first = true;
+                    for (String fname : text.getSelectionHistory()) {
+                        if (first) { first = false; continue; }
+                        allSearchSuggestions.put(Util.basename(fname), fname);
+                        currSearchSuggestions.put(Util.basename(fname), fname);
+                    }
+                }
+                searchKind = SearchKind.BUFFER;
+            }
+            protected void emacsFileOpen() {
+                if (searchKind == null) {
+                    String dirName = Util.getCurrentDirectory();
+                    if (!(new File(dirName).isDirectory())) dirName = System.getProperty("user.home");
+                    File dir = new File(dirName);
+                    searchPreQueries.add(dir.getName());
+                    File p = dir.getParentFile(); while (p != null) { searchPreQueries.add(0, p.getName()); p = p.getParentFile(); }
+                    updateFolderFiles(dir);
+                }
+                searchKind = SearchKind.FILE_OPEN;
+            }
+            private void updateFolderFiles() {
+                updateFolderFiles(new File(searchPreQuery()));
+            }
+            private void updateFolderFiles(File dir) {
+                allSearchSuggestions = new LinkedHashMap<String, Object>();
+                currSearchSuggestions = new LinkedHashMap<String, Object>();
+                if (!dir.isDirectory()) return;
+                List<File> children = Arrays.asList(dir.listFiles(new FileFilter() {
+                    public boolean accept(File f) { return f.isDirectory() || f.getName().endsWith(".als"); }
+                }));
+                Collections.sort(children, new Comparator<File>() {
+                    public int compare(File o1, File o2) {
+                        if (o1.isDirectory() && o2.isFile())       return 1;
+                        else if (o1.isFile() && o2.isDirectory())  return -1;
+                        else                                       return o1.getName().compareTo(o2.getName()); }
+                });
+                for (File f : children) {
+                    allSearchSuggestions.put(f.getName(), f);
+                    currSearchSuggestions.put(f.getName(), f);
+                }
+            }
+            protected void emacsInitOpenRecent() {
+                if (searchKind == null) {
+                    allSearchSuggestions = new LinkedHashMap<String, Object>();
+                    currSearchSuggestions = new LinkedHashMap<String, Object>();
+                    StringPref[] recents = new StringPref[] { Model0, Model1, Model2, Model3 };
+                    for (StringPref recentPref : recents) {
+                        String fname = recentPref.get();
+                        if (fname != null) {
+                            allSearchSuggestions.put(Util.basename(fname), fname);
+                            currSearchSuggestions.put(Util.basename(fname), fname);
+                        }
+                    }
+                }
+                searchKind = SearchKind.RECENT;
+            }
+            protected void emacsInitExeCommand() {
+                if (searchKind != SearchKind.COMMAND) {
+                    allSearchSuggestions = new LinkedHashMap<String, Object>();
+                    currSearchSuggestions = new LinkedHashMap<String, Object>();
+                    List<Command> cp = refreshCommands();
+                    if (cp == null) {
+                        resetSearch();
+                        return;
+                    } else {
+                        for (int i = 0; i < cp.size(); i++) {
+                            Command c = cp.get(i);
+                            allSearchSuggestions.put(c.label, i);
+                            currSearchSuggestions.put(c.label, i);
+                        }
+                    }
+                }
+                int n = allSearchSuggestions.size();
+                if (latestCommand>=n) latestCommand=n-1;
+                if (latestCommand<0) latestCommand=0;
+                for (int i = 0; i < latestCommand; i++) {
+                    rotateCurrSearchSuggestion(true);
+                }
+                searchKind = SearchKind.COMMAND;
+            }
+
+             private void emacsDoTextSearch() {
+                boolean dir = searchingForward() ? true : false;
+                searchOutcome = text.get().search(searchQuery, searchStartIndex, false, dir);
+             }
+             private void emacsDoExpandWord() {
+                 if (currMatcher == null) {
+                     currBufferIdx++;
+                     if (currPattern != null && currBufferIdx < currBuffers.size()) {
+                         currMatcher = currPattern.matcher(currBuffers.get(currBufferIdx).b);
+                     }
+                 }
+                 if (currMatcher == null) {
+                     currSearchStatus = "No further dynamic expansions for '" + currPattern.pattern() + "'";
+                     currBufferIdx = -1;
+                     currExpansionHistory.clear();
+                     return;
+                 }
+                 if (currMatcher.find()) {
+                     String wrd = currMatcher.group();
+                     if (currExpansionHistory.contains(wrd)) {
+                         emacsDoExpandWord();
+                     } else {
+                         currExpansionHistory.add(wrd);
+                         text.get().doDeletePrevWord();
+                         text.get().doInsert(wrd);
+                         currSearchStatus = "Expansion '" + wrd + "' found in '" + currBuffers.get(currBufferIdx).a + "'";
+                     }
+                 } else {
+                     currMatcher = null;
+                     emacsDoExpandWord();
+                 }
+             }
+             private void emacsDoSearch() {
+                 if (searchKind == SearchKind.FILE_OPEN && searchQuery.endsWith(searchPreQueriesSep)) {
+                     emacsDoFinishSearch();
+                     return;
+                 }
+                 filterSearchSuggestions();
+                 switch(searchKind) {
+                 case FORWARD: case BACKWARD: emacsDoTextSearch(); break;
+                 case BUFFER: case COMMAND: case RECENT: case FILE_OPEN: break;
+                 case EXPAND_WORD: emacsDoExpandWord(); break;
+                 }
+             }
+             private Boolean handleFile(File f) {
+                 if (f.isDirectory()) {
+                     searchPreQueries.add(f.getName());
+                     searchQuery = "";
+                     updateFolderFiles(f);
+                     return false;
+                 } else if (f.isFile()) {
+                     updateStatus("File Open: " + f.getAbsolutePath());
+                     doOpenFile(f.getAbsolutePath());
+                     Util.setCurrentDirectory(f.getParentFile());
+                     return true;
+                 }
+                 return null;
+             }
+             private boolean emacsDoFinishSearch() {
+                 if (searchKind == null) return true;
+                 switch(searchKind) {
+                 case FORWARD: case BACKWARD: return true;
+                 case BUFFER: case COMMAND: case RECENT: case FILE_OPEN:
+                     if (currSearchSuggestions != null && currSearchSuggestions.size() > 0) {
+                         Entry<String, Object> entry = currSearchSuggestions.entrySet().iterator().next();
+                         Object val = entry.getValue();
+                         if (searchKind == SearchKind.BUFFER) {
+                             updateStatus("Switched to buffer: " + val);
+                             text.selectByFilename((String)val);
+                             return true;
+                         } else if (searchKind == SearchKind.COMMAND) {
+                             updateStatus("Executing command: " + entry.getKey());
+                             doRun((Integer)val);
+                             return true;
+                         } else if (searchKind == SearchKind.RECENT) {
+                             updateStatus("Opened recent file: " + val);
+                             doOpenFile((String)val);
+                             return true;
+                         } else if (searchKind == SearchKind.FILE_OPEN) {
+                             File f = (File) val;
+                             Boolean b = handleFile(f);
+                             if (b != null) return b;
+                         }
+                     }
+                     break;
+                 case EXPAND_WORD: break;
+                 }
+                 return true;
+             }
+
+            public void clearCombo(boolean clearCurrentCommand) {
+                keyCombo.clear();
+                if (clearCurrentCommand) currentCommand = null;
+            }
+
+            private void updateStatus(String string)                                   { updateStatus(null, string, false); }
+            private void updateStatus(KeyEvent e, String string)                       { updateStatus(e, string, true); }
+            private void updateStatus(KeyEvent e, String string, boolean consumeEvent) {
+                if (e != null) keyCombo.add(e);
+                if (e != null && consumeEvent) consume(e);
+                currentCommand = string;
+                notifyChange();
+            }
+
+            private boolean consume(KeyEvent e) {
+                consumed = printKeyEvent(e);
+                e.consume();
+                return true;
+            }
+
+            //boolean isCombo(String mnemonic)                { return mnemonic.equals(printKeyCombos()); }
+            boolean isKey(KeyEvent e, String mnemonic)      { return printKeyEvent(e).equals(mnemonic); }
+            boolean isComboKey(KeyEvent e, String mnemonic) { return mnemonic.equals((printKeyCombos() + " " + printKeyEvent(e)).trim()); }
+        });
+   }
+
+    /* ===================================================================================================================== */
+
     /** {@inheritDoc} */
    public Object do_action(Object sender, Event e) {
       if (sender instanceof OurTabbedSyntaxWidget) switch(e) {
          case FOCUSED: notifyFocusGained(); break;
          case STATUS_CHANGE: notifyChange(); break;
+         case CARET_CMD: resetSearch(); notifyChange(); break;
          default: break;
       }
       return true;
@@ -1859,20 +2473,50 @@ public final class SimpleGUI implements ComponentListener, Listener {
       return true;
    }
 
+   private JMenuItem addToMenu(JMenu parent, Pref<?>... prefs) {
+       return addToMenu(parent, true, prefs);
+   }
+
+   private JMenuItem addToMenu(JMenu parent, boolean enabled, Pref<?>... prefs) {
+       JMenuItem ans = null;
+       for (Pref<?> p: prefs) {
+           if (p instanceof IntPref)          ans = _addToMenu(parent, (IntPref) p);
+           else if (p instanceof BooleanPref) ans = _addToMenu(parent, (BooleanPref) p);
+           else if (p instanceof ChoicePref)  ans = _addToMenu(parent, (ChoicePref<?>) p);
+           else throw new RuntimeException("Unrecognized Pref type");
+           ans.setEnabled(enabled);
+       }
+       return ans;
+   }
+
    /** Creates menu items from boolean preferences (<code>prefs</code>)
     *  and adds them to a given parent menu (<code>parent</code>). */
-   private void addToMenu(JMenu parent, BooleanPref... prefs) {
+   private JMenuItem _addToMenu(JMenu parent, IntPref... prefs) {
+       JMenuItem ans = null;
+       for (IntPref pref : prefs) {
+         Action action = pref.getTitleAction();
+         Object name = action.getValue(Action.NAME);
+         ans = menuItem(parent, name + ": " + pref.get(), action);
+      }
+       return ans;
+   }
+
+   /** Creates menu items from boolean preferences (<code>prefs</code>)
+    *  and adds them to a given parent menu (<code>parent</code>). */
+   private JMenuItem _addToMenu(JMenu parent, BooleanPref... prefs) {
+      JMenuItem ans = null;
       for (BooleanPref pref : prefs) {
          Action action = pref.getTitleAction();
          Object name = action.getValue(Action.NAME);
-         menuItem(parent, name + ": " + (pref.get() ? "Yes" : "No"), action);
+         ans = menuItem(parent, name + ": " + (pref.get() ? "Yes" : "No"), action);
       }
+      return ans;
    }
 
    /** Creates a menu item for each choice preference (from <code>prefs</code>)
     *  and adds it to a given parent menu (<code>parent</code>).*/
    @SuppressWarnings({ "rawtypes", "unchecked" })
-   private JMenu addToMenu(JMenu parent, ChoicePref... prefs) {
+   private JMenu _addToMenu(JMenu parent, ChoicePref... prefs) {
       JMenu last = null;
       for (ChoicePref pref : prefs) {
          last = new JMenu(pref.title + ": " + pref.renderValueShort(pref.get()));

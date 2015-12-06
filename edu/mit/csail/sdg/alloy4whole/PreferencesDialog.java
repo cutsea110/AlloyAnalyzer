@@ -1,6 +1,7 @@
 package edu.mit.csail.sdg.alloy4whole;
 
 import static edu.mit.csail.sdg.alloy4.A4Preferences.AntiAlias;
+
 import static edu.mit.csail.sdg.alloy4.A4Preferences.AutoVisualize;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.CoreGranularity;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.CoreMinimization;
@@ -16,6 +17,7 @@ import static edu.mit.csail.sdg.alloy4.A4Preferences.Solver;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SubMemory;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SubStack;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.SyntaxDisabled;
+import static edu.mit.csail.sdg.alloy4.A4Preferences.KeyBindings;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.TabSize;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.Unrolls;
 import static edu.mit.csail.sdg.alloy4.A4Preferences.VerbosityPref;
@@ -74,7 +76,7 @@ import edu.mit.csail.sdg.alloy4.OurUtil.GridBagConstraintsBuilder;
 import edu.mit.csail.sdg.alloy4.Subprocess;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
 
-@SuppressWarnings({"serial"})
+@SuppressWarnings({"serial", "unchecked", "rawtypes"})
 public class PreferencesDialog extends JFrame {
 
    private static final long serialVersionUID = 5577892964740788892L;
@@ -99,7 +101,6 @@ public class PreferencesDialog extends JFrame {
       public Object getPreviousValue()   { return Math.max(pref.min, pref.get() - 1); }
    }
 
-   @SuppressWarnings("unchecked")
    private static class CBModel<T> extends AbstractListModel implements ComboBoxModel {
       private final ChoicePref<T> pref;
       public CBModel(final ChoicePref<T> pref) {
@@ -250,7 +251,7 @@ public class PreferencesDialog extends JFrame {
       JPanel p = OurUtil.makeGrid(2, gbc().make(), mkCombo(FontName), mkCombo(FontSize), mkCombo(TabSize));
       addToGrid(p, mkCheckBox(SyntaxDisabled), gbc().pos(0, 3).gridwidth(2));
       addToGrid(p, mkCheckBox(AntiAlias),      gbc().pos(0, 4).gridwidth(2));
-
+      addToGrid(p, mkCombo(KeyBindings),       gbc().pos(0, 5).gridheight(2));
 //      JPanel p = new JPanel(new GridBagLayout());
 //      addToGrid(p, mkCheckBox(SyntaxDisabled), gbc().pos(0, 0).gridwidth(2));
 //      addToGrid(p, mkCheckBox(AntiAlias),      gbc().pos(0, 1).gridwidth(2));
@@ -263,7 +264,7 @@ public class PreferencesDialog extends JFrame {
 
    protected Component initSolverPane() {
       JPanel p = OurUtil.makeGrid(2, gbc().make(), mkCombo(Solver), mkSlider(SkolemDepth),
-            mkCombo(Unrolls), mkCombo(CoreGranularity), mkSlider(CoreMinimization));
+            mkSpinner(Unrolls), mkCombo(CoreGranularity), mkSlider(CoreMinimization));
       int r = 5;
       addToGrid(p, mkCheckBox(NoOverflow),           gbc().pos(0, r++).gridwidth(2));
       addToGrid(p, mkCheckBox(ImplicitThis),         gbc().pos(0, r++).gridwidth(2));
@@ -381,7 +382,6 @@ public class PreferencesDialog extends JFrame {
        return OurUtil.makeH(pref.title + ": ", jtf);
    }
 
-   @SuppressWarnings({ "unchecked" })
    protected <T> JPanel mkCombo(final ChoicePref<T> pref) {
       JComboBox cb = make(new JComboBox(mkComboBoxModelFor(pref)));
       pref2comp.put(pref, cb);
@@ -452,10 +452,10 @@ public class PreferencesDialog extends JFrame {
          pref.addChangeListener(l);
       }
    }
-   
+
    public static Action decorateWithLogging(final SwingLogPanel log, final Pref<?> pref, final Action action) {
        if (log == null) return action;
-       return new AbstractAction((String)action.getValue(Action.NAME), (Icon)action.getValue(Action.SMALL_ICON)) {        
+       return new AbstractAction((String)action.getValue(Action.NAME), (Icon)action.getValue(Action.SMALL_ICON)) {
          private static final long serialVersionUID = -2790668001235140089L;
          public void actionPerformed(ActionEvent e) {
              Object oldVal = pref.get();
@@ -466,7 +466,7 @@ public class PreferencesDialog extends JFrame {
           }
        };
     }
-   
+
    public static void logPrefChanged(SwingLogPanel log, Pref<?> pref) {
        if (log == null) return;
        log.log("Option ");

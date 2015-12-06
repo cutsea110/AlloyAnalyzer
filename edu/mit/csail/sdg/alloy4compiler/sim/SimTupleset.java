@@ -25,11 +25,12 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.ErrorAPI;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.Util;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 
 /** Immutable; represents a tupleset. */
 

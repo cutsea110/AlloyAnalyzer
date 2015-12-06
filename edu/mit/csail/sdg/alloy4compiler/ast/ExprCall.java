@@ -15,20 +15,22 @@
 
 package edu.mit.csail.sdg.alloy4compiler.ast;
 
+import static edu.mit.csail.sdg.alloy4compiler.ast.Type.EMPTY;
+
 import java.util.Collection;
 import java.util.List;
-import edu.mit.csail.sdg.alloy4.JoinableList;
-import edu.mit.csail.sdg.alloy4.Pos;
+
+import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4.Env;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
-import edu.mit.csail.sdg.alloy4.ErrorWarning;
 import edu.mit.csail.sdg.alloy4.ErrorType;
-import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.JoinableList;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.Util;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Type.EMPTY;
 
 /** Immutable; represents a call.
  *
@@ -153,6 +155,7 @@ public final class ExprCall extends Expr {
         @Override public Type visit(Sig x)          { return x.type; }
         @Override public Type visit(Field x)        { return x.type; }
         @Override public Type visit(ExprList x)     { return Type.FORMULA; }
+        @Override public Type visit(ExprFix x)      { return Type.FORMULA; }
     }
 
     //============================================================================================================//

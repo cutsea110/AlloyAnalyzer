@@ -16,6 +16,7 @@
 package edu.mit.csail.sdg.alloy4;
 
 import javax.swing.SwingUtilities;
+
 import com.apple.eawt.Application;
 import com.apple.eawt.ApplicationAdapter;
 import com.apple.eawt.ApplicationEvent;

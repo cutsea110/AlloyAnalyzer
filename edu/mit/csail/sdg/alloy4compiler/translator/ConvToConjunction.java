@@ -19,17 +19,18 @@ import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprBinary;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprCall;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprFix;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprITE;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprQt;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
+import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 
 /** Immutable; this class rearranges the AST to promote as many clauses up to the top level as possible
  * (in order to get better precision unsat core results)
@@ -52,8 +53,8 @@ final class ConvToConjunction extends VisitReturn<Expr> {
         if (x.op == ExprQt.Op.ALL) {
             Expr s = x.sub.deNOP();
             if (s instanceof ExprBinary && ((ExprBinary)s).op==ExprBinary.Op.AND) {
-                Expr a = visitThis(x.op.make(Pos.UNKNOWN, Pos.UNKNOWN, x.decls, ((ExprBinary)s).left));
-                Expr b = visitThis(x.op.make(Pos.UNKNOWN, Pos.UNKNOWN, x.decls, ((ExprBinary)s).right));
+                Expr a = visitThis(x.op.make(Pos.UNKNOWN, Pos.UNKNOWN, x.decls, x.dom, ((ExprBinary)s).left));
+                Expr b = visitThis(x.op.make(Pos.UNKNOWN, Pos.UNKNOWN, x.decls, x.dom, ((ExprBinary)s).right));
                 return a.and(b);
             }
         }
@@ -99,4 +100,6 @@ final class ConvToConjunction extends VisitReturn<Expr> {
 
     /** {@inheritDoc} */
     @Override public Expr visit(Field x) { return x; }
+
+    @Override public Expr visit(ExprFix x) {  return x; }
 }

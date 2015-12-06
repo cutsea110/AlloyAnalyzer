@@ -20,21 +20,23 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import edu.mit.csail.sdg.alloy4.A4Reporter;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorAPI;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
 import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4.Version;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.Type;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.SubsetSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Type;
 
 /** This helper class contains helper routines for writing an A4Solution object out as an XML file. */
 
@@ -47,7 +49,7 @@ public final class A4SolutionWriter {
     private final A4Solution sol;
 
     /** This is the A4Reporter that we're sending diagnostic messages to; can be null if none. */
-    private final A4Reporter rep;
+    private final IA4Reporter rep;
 
     /** This is the list of toplevel sigs. */
     private final List<PrimSig> toplevels = new ArrayList<PrimSig>();
@@ -80,8 +82,18 @@ public final class A4SolutionWriter {
           while(true) {
              A4TupleSet ts = (A4TupleSet)(sol.eval(expr.minus(sum)));
              int n = ts.size();
+//             //TODO: check
+//             int unused = 0;
+//             for (A4Tuple t: ts) if (t.atom(0).toString().startsWith("unused")) unused++;
+//             n = ts.size() - unused;
+//             //--
              if (n<=0) break;
-             if (lastSize>0 && lastSize<=n) throw new ErrorFatal("An internal error occurred in the evaluator.");
+             //TODO: check what's happening here and why when it breaks below, the file ends up being corrupted
+             if (lastSize>0 && lastSize<=n) return false;
+                 // throw new ErrorFatal("An internal error occurred in the evaluator.");
+//             boolean toBreak = lastSize>0 && lastSize<=n;
+//             if (toBreak)
+//                 break;
              lastSize=n;
              Type extra = ts.iterator().next().type();
              type = type.merge(extra);
@@ -106,6 +118,14 @@ public final class A4SolutionWriter {
        return true;
     }
 
+    private void writeIntScope(final IntScope intScope) throws Err {
+        out.print("\n<intscope bitwidth=\""+intScope.bitwidth+"\">");
+        if (intScope.atoms != null) {
+            intScope.atoms.toXML(out, "  ");
+        }
+        out.print("\n</intscope>");
+    }
+
     /** Write the given Sig. */
     private A4TupleSet writesig(final Sig x) throws Err {
        A4TupleSet ts = null, ts2 = null;
@@ -120,6 +140,7 @@ public final class A4SolutionWriter {
        if (x instanceof PrimSig && x!=Sig.UNIV) Util.encodeXMLs(out, "\" parentID=\"", map(((PrimSig)x).parent));
        if (x.builtin) out.print("\" builtin=\"yes");
        if (x.isAbstract!=null) out.print("\" abstract=\"yes");
+       if (x.isAtom!=null) out.print("\" atomsig=\"yes");
        if (x.isOne!=null) out.print("\" one=\"yes");
        if (x.isLone!=null) out.print("\" lone=\"yes");
        if (x.isSome!=null) out.print("\" some=\"yes");
@@ -173,17 +194,18 @@ public final class A4SolutionWriter {
     }
 
     /** If sol==null, write the list of Sigs as a Metamodel, else write the solution as an XML file. */
-    private A4SolutionWriter(A4Reporter rep, A4Solution sol, Iterable<Sig> sigs, int bitwidth, int maxseq, String originalCommand, String originalFileName, PrintWriter out, Iterable<Func> extraSkolems) throws Err {
+    private A4SolutionWriter(IA4Reporter rep, A4Solution sol, Iterable<Sig> sigs, IntScope intScope, int maxseq, String originalCommand, String originalFileName, PrintWriter out, Iterable<Func> extraSkolems) throws Err {
         this.rep = rep;
         this.out = out;
         this.sol = sol;
         for (Sig s:sigs) if (s instanceof PrimSig && ((PrimSig)s).parent==Sig.UNIV) toplevels.add((PrimSig)s);
-        out.print("<instance bitwidth=\""); out.print(bitwidth);
-        out.print("\" maxseq=\""); out.print(maxseq);
+        out.print("<instance maxseq=\""); out.print(maxseq);        
         out.print("\" command=\""); Util.encodeXML(out, originalCommand);
+        if (sol!=null) out.print("\" noOverflow=\"" + sol.isNoOverflow());
         out.print("\" filename=\""); Util.encodeXML(out, originalFileName);
         if (sol==null) out.print("\" metamodel=\"yes");
         out.print("\">\n");
+        writeIntScope(intScope);
         writesig(Sig.UNIV);
         for (Sig s:sigs) if (s instanceof SubsetSig) writesig(s);
         if (sol!=null) for (ExprVar s:sol.getAllSkolems()) { if (rep!=null) rep.write(s); writeSkolem(s); }
@@ -206,11 +228,11 @@ public final class A4SolutionWriter {
     }
 
     /** If this solution is a satisfiable solution, this method will write it out in XML format. */
-    static void writeInstance(A4Reporter rep, A4Solution sol, PrintWriter out, Iterable<Func> extraSkolems, Map<String,String> sources) throws Err {
+    static void writeInstance(IA4Reporter rep, A4Solution sol, PrintWriter out, Iterable<Func> extraSkolems, Map<String,String> sources) throws Err {
         if (!sol.satisfiable()) throw new ErrorAPI("This solution is unsatisfiable.");
         try {
             Util.encodeXMLs(out, "<alloy builddate=\"", Version.buildDate(), "\">\n\n");
-            new A4SolutionWriter(rep, sol, sol.getAllReachableSigs(), sol.getBitwidth(), sol.getMaxSeq(), sol.getOriginalCommand(), sol.getOriginalFilename(), out, extraSkolems);
+            new A4SolutionWriter(rep, sol, sol.getAllReachableSigs(), sol.intScope(), sol.getMaxSeq(), sol.getOriginalCommand(), sol.getOriginalFilename(), out, extraSkolems);
             if (sources!=null) for(Map.Entry<String,String> e: sources.entrySet()) {
                 Util.encodeXMLs(out, "\n<source filename=\"", e.getKey(), "\" content=\"", e.getValue(), "\"/>\n");
             }
@@ -224,7 +246,8 @@ public final class A4SolutionWriter {
     /** Write the metamodel as &lt;instance&gt;..&lt;/instance&gt; in XML format. */
     public static void writeMetamodel(ConstList<Sig> sigs, String originalFilename, PrintWriter out) throws Err {
         try {
-            new A4SolutionWriter(null, null, sigs, 4, 4, "show metamodel", originalFilename, out, null);
+            IntScope defaultIntScope = IntScope.mkBitwidth(4);
+            new A4SolutionWriter(null, null, sigs, defaultIntScope, 4, "show metamodel", originalFilename, out, null);
         } catch(Throwable ex) {
             if (ex instanceof Err) throw (Err)ex; else throw new ErrorFatal("Error writing the solution XML file.", ex);
         }

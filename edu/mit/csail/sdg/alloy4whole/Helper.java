@@ -15,8 +15,9 @@
 
 package edu.mit.csail.sdg.alloy4whole;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;

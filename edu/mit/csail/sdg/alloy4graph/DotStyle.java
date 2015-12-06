@@ -16,6 +16,7 @@
 package edu.mit.csail.sdg.alloy4graph;
 
 import javax.swing.Icon;
+
 import edu.mit.csail.sdg.alloy4.OurUtil;
 
 /** Immutable; this defines the set of possible line styles (SOLID, DASHED, DOTTED...)

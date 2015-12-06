@@ -15,9 +15,9 @@
 
 package edu.mit.csail.sdg.alloy4compiler.translator;
 
-import edu.mit.csail.sdg.alloy4compiler.ast.Type;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
 import kodkod.instance.Tuple;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Type;
 
 /** Immutable; represents a single Alloy tuple; comparison is by identity rather than by value. */
 

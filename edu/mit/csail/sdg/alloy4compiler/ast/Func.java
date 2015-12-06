@@ -18,11 +18,12 @@ package edu.mit.csail.sdg.alloy4compiler.ast;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
-import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.Util;
 
 /** Mutable; represents a predicate or function.
@@ -41,16 +42,16 @@ public final class Func extends Browsable {
     public final Pos isPrivate;
 
     /** The label of this predicate/function; it does not need to be unique. */
-    public final String label;
+    public String label;
 
     /** True if this is a predicate; false if this is a function. */
     public final boolean isPred;
 
     /** The list of parameter declarations; may be an empty list if this predicate/function has no parameters. */
-    public final ConstList<Decl> decls;
+    public ConstList<Decl> decls;
 
     /** The declared return type; never null. */
-    public final Expr returnDecl;
+    public Expr returnDecl;
 
     /** Return the number of parameters. */
     public int count() {
@@ -139,6 +140,14 @@ public final class Func extends Browsable {
            throw new ErrorSyntax(d.expr.span(), "Parameter declaration cannot contain predicate/function calls.");
         if (returnDecl.hasCall())
            throw new ErrorSyntax(returnDecl.span(), "Return type declaration cannot contain predicate/function calls.");
+    }
+
+    public void update(String label, ConstList<Decl> decls, Expr ret, Expr body) throws Err {
+        Func tmpFunc = new Func(this.pos, this.isPrivate, label, decls, ret, body);
+        this.label = tmpFunc.label;
+        this.decls = tmpFunc.decls;
+        this.returnDecl = tmpFunc.returnDecl;
+        this.body = tmpFunc.body;
     }
 
     /** The predicate/function body; never null. */

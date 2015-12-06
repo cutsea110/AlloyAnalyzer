@@ -76,7 +76,8 @@ public abstract class VisitQuery<T> extends VisitReturn<T> {
            for(ExprHasName v: d.names) { T ans = v.accept(this); if (ans!=null) return ans; }
            T ans = d.expr.accept(this); if (ans!=null) return ans;
         }
-        return x.sub.accept(this);
+        T ans = x.dom.accept(this);
+        return ans != null ? ans : x.sub.accept(this);
     }
 
     /** Visits an ExprUnary node (OP X) by calling accept() on X. */
@@ -98,4 +99,9 @@ public abstract class VisitQuery<T> extends VisitReturn<T> {
     @Override public T visit(Field x) throws Err {
         return null;
     }
+
+    @Override public T visit(ExprFix x) throws Err {
+        return null;
+    }
+
 }

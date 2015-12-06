@@ -15,11 +15,12 @@
 
 package edu.mit.csail.sdg.alloy4graph;
 
+import static java.awt.Color.BLACK;
+import static java.awt.Color.WHITE;
 import static java.awt.event.InputEvent.BUTTON1_MASK;
 import static java.awt.event.InputEvent.BUTTON3_MASK;
 import static java.awt.event.InputEvent.CTRL_MASK;
-import static java.awt.Color.WHITE;
-import static java.awt.Color.BLACK;
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -37,6 +38,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -47,6 +49,7 @@ import javax.swing.JViewport;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+
 import edu.mit.csail.sdg.alloy4.OurDialog;
 import edu.mit.csail.sdg.alloy4.OurPDFWriter;
 import edu.mit.csail.sdg.alloy4.OurPNGWriter;

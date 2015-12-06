@@ -18,6 +18,7 @@ package edu.mit.csail.sdg.alloy4;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
 import javax.swing.BoxLayout;
 import javax.swing.Icon;
 import javax.swing.JCheckBox;

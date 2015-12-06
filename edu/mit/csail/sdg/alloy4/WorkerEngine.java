@@ -153,7 +153,7 @@ public final class WorkerEngine {
                // All else, try "java" (and let the Operating System search the program path...)
                if (f.isFile()) java = f.getAbsolutePath();
             }
-            String debug = "yes".equals(System.getProperty("debug")) ? "yes" : "no";
+            String debug = Util.isDebug() ? "yes" : "no";
             if (jniPath!=null && jniPath.length()>0)
                sub = Runtime.getRuntime().exec(new String[] {
                      java,
@@ -185,6 +185,7 @@ public final class WorkerEngine {
                   main2sub = new ObjectOutputStream(wrap(sub.getOutputStream())); main2sub.writeObject(task); main2sub.close();
                   sub2main = new ObjectInputStream(wrap(sub.getInputStream()));
                } catch(Throwable ex) {
+                  ex.printStackTrace();
                   sub.destroy(); Util.close(main2sub); Util.close(sub2main);
                   synchronized(WorkerEngine.class) { if (latest_sub != sub) return; callback.fail(); return; }
                }
@@ -194,6 +195,7 @@ public final class WorkerEngine {
                   try {
                      x = sub2main.readObject();
                   } catch(Throwable ex) {
+                     ex.printStackTrace();
                      sub.destroy(); Util.close(sub2main);
                      synchronized(WorkerEngine.class) { if (latest_sub != sub) return; callback.fail(); return; }
                   }

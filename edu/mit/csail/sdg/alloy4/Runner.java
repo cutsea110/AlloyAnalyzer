@@ -19,8 +19,9 @@ import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
-import java.awt.event.WindowListener;
 import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+
 import javax.swing.AbstractAction;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;

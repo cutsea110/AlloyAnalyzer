@@ -69,4 +69,6 @@ public abstract class VisitReturn<T> {
 
     /** Visits a Field node. */
     public abstract T visit(Field x) throws Err;
+
+    public abstract T visit(ExprFix x) throws Err;
 }

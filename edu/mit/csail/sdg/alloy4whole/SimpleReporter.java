@@ -23,11 +23,22 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import kodkod.ast.Formula;
+import kodkod.engine.hol.HOLTranslation;
+import kodkod.engine.hol.HOLTranslationNew;
+import kodkod.instance.Bounds;
+import kodkod.instance.Instance;
+import kodkod.util.nodes.PrettyPrinter;
+import edu.mit.csail.sdg.alloy4.A4Preferences;
+import edu.mit.csail.sdg.alloy4.A4Preferences.InstFormat;
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.ConstMap;
@@ -35,18 +46,19 @@ import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
 import edu.mit.csail.sdg.alloy4.MailBug;
 import edu.mit.csail.sdg.alloy4.OurDialog;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4.Version;
-import edu.mit.csail.sdg.alloy4.XMLNode;
 import edu.mit.csail.sdg.alloy4.WorkerEngine.WorkerCallback;
 import edu.mit.csail.sdg.alloy4.WorkerEngine.WorkerTask;
+import edu.mit.csail.sdg.alloy4.XMLNode;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Module;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompUtil;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
@@ -66,9 +78,12 @@ final class SimpleReporter extends A4Reporter {
         private final SwingLogPanel span;
         private final Set<ErrorWarning> warnings = new HashSet<ErrorWarning>();
         private final List<String> results = new ArrayList<String>();
+        private final Map<String, Pair<Integer, String>> holTrPos = new HashMap<String, Pair<Integer, String>>();
+        private final Map<String, Integer> seenFolTr = new HashMap<String, Integer>();
         private int len2=0, len3=0, verbosity=0;
         private final String latestName;
         private final int latestVersion;
+        private String holIndent="";
         public SimpleCallback1(SimpleGUI gui, VizGUI viz, SwingLogPanel span, int verbosity, String latestName, int latestVersion) {
             this.gui=gui; this.viz=viz; this.span=span; this.verbosity=verbosity;
             this.latestName=latestName; this.latestVersion=latestVersion;
@@ -127,8 +142,44 @@ final class SimpleReporter extends A4Reporter {
             if (array[0].equals("link")) { span.logLink((String)(array[1]), (String)(array[2])); }
             if (array[0].equals("bold")) { span.logBold(""+array[1]); }
             if (array[0].equals("")) { span.log(""+array[1]); }
-            if (array[0].equals("scope") && verbosity>0) { span.log("   " + array[1]); }
-            if (array[0].equals("bound") && verbosity>1) { span.log("   " + array[1]); }
+            if (array[0].equals("scope") && verbosity>0)  { span.log("   " + array[1]); }
+            if (array[0].equals("bound") && verbosity>1)  { span.log("   " + array[1]); }
+            if (array[0].equals("gensol") && verbosity>0) {
+                span.log("   Generating the solution ");
+                if (verbosity > 2) { formatLinks(array, 1); }
+                span.log("...");
+                gotoEnd(); }
+            if (array[0].equals("hol-start"))          { logHOL(array, "started", false); }
+            if (array[0].equals("hol-candidate"))      { logHOL(array, " candidate found", false); }
+            if (array[0].equals("hol-verify"))         { logHOL(array, "  verifying candidate", true); holIndent(array, "   |- "); }
+            if (array[0].equals("hol-verify-outcome")) {
+                Pair<Integer, String> p = holTrPos.get(array[2]);
+                if (p != null) {
+                    if (array[4] == null) {
+                        String pre = "success (";
+                        String text = "#cand = " + array[5];
+                        span.logAt(p.a, pre);
+                        span.logBoldAt(p.a + pre.length(), text);
+                        span.logAt(p.a + pre.length() + text.length(), ")");
+                    } else {
+                        formatLinkAt(p.a, array[4]);
+                    }
+                    holIndent = p.b;
+                    gotoEnd(false);
+                }
+            }
+            if (array[0].equals("hol-split"))              { logHOL(array, "solving splits", false); }
+            if (array[0].equals("hol-next"))               { logHOL(array, "  searching for next candidate ", false); }
+            if (array[0].equals("hol-split-choice"))       { logHOL(array, "  trying choice", true); }
+            if (array[0].equals("hol-split-choice-sat"))   { Integer pos = getHOLpos(array[2]); if (pos != null){ formatLinkAt(pos, array[4]); gotoEnd(false); }}
+            if (array[0].equals("hol-split-choice-unsat")) { Integer pos = getHOLpos(array[2]); if (pos != null){ span.logAt(pos, "unsat"); gotoEnd(false); }}
+            if (array[0].equals("hol-fix-start"))          { logHOL(array, "solving fixpoint", false); }
+            if (array[0].equals("hol-fix-unsat"))          { logHOL(array, "  no solution found", false); }
+            if (array[0].equals("hol-fix-first"))          { logHOL(array, "  first solution found", false); }
+            if (array[0].equals("hol-fix-inc"))            { logHOL(array, "  incrementing", true); }
+            if (array[0].equals("hol-fix-inc-sat"))        { Integer pos = getHOLpos(array[2]); if (pos!=null) { formatLinkAt(pos, array[4]); gotoEnd(false); }}
+            if (array[0].equals("hol-fix-inc-unsat"))      { Integer pos = getHOLpos(array[2]); if (pos!=null) { span.logAt(pos, "unsat"); gotoEnd(false); }}
+
             if (array[0].equals("resultCNF")) { results.add(null); span.setLength(len3); span.log("   File written to "+array[1]+"\n\n"); }
             if (array[0].equals("debug") && verbosity>2) { span.log("   "+array[1]+"\n"); len2=len3=span.getLength(); }
             if (array[0].equals("translate")) { span.log("   " + array[1]); len3 = span.getLength(); span.logBold("   Generating CNF...\n"); }
@@ -208,9 +259,78 @@ final class SimpleReporter extends A4Reporter {
             }
             span.flush();
         }
+        private Integer getHOLpos(Object trId) {
+            Pair<Integer, String> p = holTrPos.get(trId);
+            return p != null ? p.a : null;
+        }
+
+        private void logHOL(Object[] links, String msg, boolean rememberPos) {
+            String trName = links[1].toString();
+            String trId = links[2].toString();
+            String folTrId = trId; //links[3].toString();
+            Integer ord = seenFolTr.get(folTrId);
+            if (ord == null) { ord = seenFolTr.size(); seenFolTr.put(trId, ord); }
+            span.log("   ");
+            span.log(holIndent);
+            span.logPaletteBold(trName, ord.intValue());
+            span.log(" " + msg + " ");
+            formatLinks(links, 4);
+            span.log(" ");
+            gotoEnd(false);
+            if (rememberPos) {
+                holTrPos.put(trId, new Pair<Integer, String>(span.getLength(), holIndent));
+            }
+            gotoEnd(true);
+        }
+        private void holIndent(Object[] links, String extra) {
+            String trName = links[1].toString();
+            holIndent = holIndent + trName.replaceAll(".", " ") + extra;
+        }
+        private void gotoEnd()                                            { gotoEnd(true); }
+        private void gotoEnd(boolean newline)                             { if(newline) span.log("\n"); len2=len3=span.getLength(); }
+        private void formatLinks(Object[] objs, int startIdx)             { formatLinks(objs, startIdx, objs.length); }
+        private void formatLinks(Object[] objs, int startIdx, int endIdx) {
+            objs = Arrays.copyOfRange(objs, startIdx, endIdx);
+            if (objs.length == 0) return;
+            span.log("(");
+            boolean fst = true;
+            for (Object obj: objs) {
+                if (!fst) span.log(", ");
+                formatLink((LogLink) obj);
+                fst = false;
+            }
+            span.log(")");
+        }
+        @SuppressWarnings("unused")
+        private void formatLink(Object link)             { formatLink((LogLink)link); }
+        private void formatLink(LogLink link)            { span.logLink(link.label, link.href); }
+        private void formatLinkAt(int pos, Object link)  { formatLinkAt(pos, (LogLink)link); }
+        private void formatLinkAt(int pos, LogLink link) { span.logLink(pos, link.label, link.href); }
     }
 
-    private void cb(Serializable... objs) { cb.callback(objs); }
+    private void cb(String key, HOLTranslation tr, Serializable... objs) {
+        List<Serializable> sers = new ArrayList<Serializable>(objs.length + 5);
+        String tab = "  "; StringBuilder idn = new StringBuilder("");
+        for (int i = 0; i < tr.depth(); i++) idn.append(tab);
+        sers.add(key);
+        sers.add(idn + "[" + tr.getClass().getSimpleName() + "]");
+        String trId = Integer.toString(System.identityHashCode(tr));
+        if (tr instanceof HOLTranslationNew.OR)
+           trId += "_" + Integer.toString(System.identityHashCode(((HOLTranslationNew.OR) tr).currTr()));
+        else if (tr instanceof HOLTranslationNew.Some4All)
+           trId += "_" + Integer.toString(System.identityHashCode(((HOLTranslationNew.Some4All) tr).convTr()));
+        sers.add(trId);
+        sers.add(System.identityHashCode(tr.getCurrentFOLTranslation()));
+        for (int i = 0; i < objs.length; i++) sers.add(objs[i]);
+        if ("hol-verify-outcome".equals(key) && objs[0] == null && tr instanceof HOLTranslationNew.Some4All) {
+            sers.add(((HOLTranslationNew.Some4All)tr).numCandidates());
+        }
+        cb(sers.toArray(new Serializable[0]));
+    }
+
+    private void cb(Serializable... objs) {
+        cb.callback(objs);
+    }
 
     /** {@inheritDoc} */
     @Override public void resultCNF(final String filename) { cb("resultCNF", filename); }
@@ -222,7 +342,28 @@ final class SimpleReporter extends A4Reporter {
     @Override public void scope(final String msg) { cb("scope", msg); }
 
     /** {@inheritDoc} */
-    @Override public void bound(final String msg) { cb("bound", msg); }
+    @Override public void bound(final String msg)     { cb("bound", msg); }
+    @Override public void generatingSolution(Formula f, Bounds bounds) { cb("gensol", link("formula", f), link("bounds", bounds)); }
+
+
+    public void holLoopStart(HOLTranslation tr, Formula formula, Bounds bounds) { cb("hol-start", tr, link("formula", formula), link("bounds", bounds)); }
+    public void holCandidateFound(HOLTranslation tr, Instance candidate)        { cb("hol-candidate", tr, cand(candidate)); }
+    public void holVerifyingCandidate(HOLTranslation tr, Instance c, Formula cf, Bounds b) { cb("hol-verify", tr, link("condition", cf), link("pi", b)); }
+    public void holCandidateVerified(HOLTranslation tr, Instance candidate)                { cb("hol-verify-outcome", tr, (Serializable)null); }
+    public void holCandidateNotVerified(HOLTranslation tr, Instance cnd, Instance cex)     { cb("hol-verify-outcome", tr, cex(cex)); }
+    public void holFindingNextCandidate(HOLTranslation tr, Formula inc) { cb("hol-next", tr, link("increment", inc)); }
+
+    public void holSplitStart(HOLTranslation tr, Formula formula)      { cb("hol-split", tr, link("formula", formula)); }
+    public void holSplitChoice(HOLTranslation tr, Formula f, Bounds b) { cb("hol-split-choice", tr, link("formula", f), link("bounds", b)); }
+    public void holSplitChoiceSAT(HOLTranslation tr, Instance inst)    { cb("hol-split-choice-sat", tr, link("instance", inst)); }
+    public void holSplitChoiceUNSAT(HOLTranslation tr)                 { cb("hol-split-choice-unsat", tr); }
+
+    public void holFixpointStart(HOLTranslation tr, Formula formula, Bounds bounds) { cb("hol-fix-start", tr, link("formula", formula), link("bounds", bounds)); }
+    public void holFixpointNoSolution(HOLTranslation tr)                            { cb("hol-fix-unsat", tr); }
+    public void holFixpointFirstSolution(HOLTranslation tr, Instance candidate)     { cb("hol-fix-first", tr, link("instance", candidate)); }
+    public void holFixpointIncrementing(HOLTranslation tr, Formula inc)             { cb("hol-fix-inc", tr, link("formula", inc)); }
+    public void holFixpointIncrementingOutcome(HOLTranslation tr, Instance next)    { if (next != null) cb("hol-fix-inc-sat", tr, link("instance", next));
+                                                                                      else              cb("hol-fix-inc-unsat", tr); }
 
     /** {@inheritDoc} */
     @Override public void debug(final String msg) { cb("debug", msg.trim()); }
@@ -314,7 +455,12 @@ final class SimpleReporter extends A4Reporter {
         else cb("unsat", cmd.check, cmd.expects, minimized-lastTime, formulafilename, corefilename, minimizedBefore, minimizedAfter, (System.currentTimeMillis()-minimized));
     }
 
-    private final WorkerCallback cb;
+    private Serializable cand(Instance inst)            { return new LogLink("candidate", inst, tempdir, "candidate"); }
+    private Serializable cex(Instance inst)             { return new LogLink("counterexample", inst, tempdir, "cex"); }
+    private Serializable link(String label, Object obj) { return new LogLink(label, obj, tempdir); }
+
+    private WorkerCallback cb;
+
 
     //========== These fields should be set each time we execute a set of commands
 
@@ -336,6 +482,9 @@ final class SimpleReporter extends A4Reporter {
     /** The filename where we can write a temporary Java file or Core file. */
     private String tempfile=null;
 
+    /** temp dir */
+    private String tempdir = null;
+
     //========== These fields may be altered as each successful command generates a Kodkod or Metamodel instance
 
     /** The set of Strings already enumerated for this current solution. */
@@ -347,6 +496,9 @@ final class SimpleReporter extends A4Reporter {
     /** The root Module corresponding to this.latestKodkod; this field must be synchronized. */
     private static Module latestModule=null;
 
+    /** Latest reporter */
+    private static SimpleReporter latestRep=null;
+
     /** The source code corresponding to the latest solution generated by Kodkod; this field must be synchronized. */
     private static ConstMap<String,String> latestKodkodSRC = null;
 
@@ -356,13 +508,16 @@ final class SimpleReporter extends A4Reporter {
     /** The XML filename corresponding to the latest metamodel generated by TranslateAlloyToMetamodel; this field must be synchronized. */
     private static String latestMetamodelXML=null;
 
-    /** Constructor is private. */
-    private SimpleReporter(WorkerCallback cb, boolean recordKodkod) { this.cb=cb; this.recordKodkod=recordKodkod; }
+    private static int inst_cnt = 0;
+
+    /** Constructor is private.
+     * @param simpleTask1 */
+    private SimpleReporter(WorkerCallback cb, String tempdir, boolean recordKodkod) { this.tempdir = tempdir; this.cb=cb; this.recordKodkod=recordKodkod; }
 
     /** Helper method to write out a full XML file. */
-    private static void writeXML(A4Reporter rep, Module mod, String filename, A4Solution sol, Map<String,String> sources) throws Exception {
+    private static void writeXML(IA4Reporter rep, Module mod, String filename, A4Solution sol, Map<String,String> sources) throws Exception {
         sol.writeXML(rep, filename, mod.getAllFunc(), sources);
-        if ("yes".equals(System.getProperty("debug"))) validate(filename);
+        if (Util.isDebug()) validate(filename);
     }
 
     private int warn=0;
@@ -387,6 +542,7 @@ final class SimpleReporter extends A4Reporter {
                    {cb("pop", "Error: the SAT solver that generated the instance has exited,\nso we cannot enumerate unless you re-solve that command.\n"); return;}
                 sol=latestKodkod;
                 mod=latestModule;
+                latestRep.setWorkerCallback(out);
             }
             if (!sol.satisfiable())
                 {cb("pop", "Error: This command is unsatisfiable,\nso there are no solutions to enumerate."); return;}
@@ -418,6 +574,10 @@ final class SimpleReporter extends A4Reporter {
         StaticInstanceReader.parseInstance(new File(filename));
     }
 
+    public void setWorkerCallback(WorkerCallback wc) {
+        this.cb = wc;
+    }
+
     /** Task that perform one command. */
     static final class SimpleTask1 implements WorkerTask {
         private static final long serialVersionUID = 0;
@@ -431,13 +591,14 @@ final class SimpleReporter extends A4Reporter {
         public void cb(WorkerCallback out, Object... objs) throws IOException { out.callback(objs); }
         public void run(WorkerCallback out) throws Exception {
             cb(out, "S2", "Starting the solver...\n\n");
-            final SimpleReporter rep = new SimpleReporter(out, options.recordKodkod);
-            final Module world = CompUtil.parseEverything_fromFile(rep, map, options.originalFilename, resolutionMode);
-            final List<Sig> sigs = world.getAllReachableSigs();
-            final ConstList<Command> cmds = world.getAllCommands();
+            latestRep = new SimpleReporter(out, this.tempdir, options.recordKodkod);
+            Module world = CompUtil.parseEverything_fromFile(latestRep, map, options.originalFilename, resolutionMode);
+            List<Sig> sigs = world.getAllReachableSigs();
+            ConstList<Command> cmds = world.getAllCommands();
+            final int nCmds = cmds.size();
             cb(out, "warnings", bundleWarningNonFatal);
-            if (rep.warn>0 && !bundleWarningNonFatal) return;
-            List<String> result = new ArrayList<String>(cmds.size());
+            if (latestRep.warn>0 && !bundleWarningNonFatal) return;
+            List<String> result = new ArrayList<String>(nCmds);
             if (bundleIndex==-2) {
                 final String outf=tempdir+File.separatorChar+"m.xml";
                 cb(out, "S2", "Generating the metamodel...\n");
@@ -446,52 +607,115 @@ final class SimpleReporter extends A4Reporter {
                 A4SolutionWriter.writeMetamodel(ConstList.make(sigs), options.originalFilename, of);
                 Util.encodeXMLs(of, "\n</alloy>");
                 Util.close(of);
-                if ("yes".equals(System.getProperty("debug"))) validate(outf);
+                if (Util.isDebug()) validate(outf);
                 cb(out, "metamodel", outf);
                 synchronized(SimpleReporter.class) { latestMetamodelXML=outf; }
-            } else for(int i=0; i<cmds.size(); i++) if (bundleIndex<0 || i==bundleIndex) {
+            } else for(int i=0; i<nCmds; i++) if (bundleIndex<0 || i==bundleIndex) {
+                // if (Execute All) && (not executing first command) && (using higher-order solver) => must rebuild world because of atomSigs
+                if (bundleIndex<0 && i>0 && options.higherOrderSolver) {
+                    cb(out, "", "Rebuilding world because higher-order solver is used.\n");
+                    world = CompUtil.parseEverything_fromFile(latestRep, map, options.originalFilename, resolutionMode);
+                    sigs = world.getAllReachableSigs();
+                    cmds = world.getAllCommands();
+                }
                 synchronized(SimpleReporter.class) { latestModule=world; latestKodkodSRC=ConstMap.make(map); }
                 final String tempXML=tempdir+File.separatorChar+i+".cnf.xml";
                 final String tempCNF=tempdir+File.separatorChar+i+".cnf";
                 final Command cmd=cmds.get(i);
-                rep.tempfile=tempCNF;
+                latestRep.tempfile=tempCNF;
                 cb(out, "bold", "Executing \""+cmd+"\"\n");
-                A4Solution ai=TranslateAlloyToKodkod.execute_commandFromBook(rep, world.getAllReachableSigs(), cmd, options);
-                if (ai==null) result.add(null);
-                else if (ai.satisfiable()) result.add(tempXML);
-                else if (ai.highLevelCore().a.size()>0) result.add(tempCNF+".core");
-                else result.add("");
+                TranslateAlloyToKodkod tr = TranslateAlloyToKodkod.translate(latestRep, world.getAllReachableSigs(), cmd, options);
+                A4Solution sol = tr.getFrame();
+                latestKodkod = sol;
+                sol = tr.executeCommandFromBook();
+                        //TranslateAlloyToKodkod.execute_commandFromBook(rep, world.getAllReachableSigs(), cmd, options);
+                if (sol==null) result.add(null);
+                else if (sol.satisfiable()) result.add(tempXML);
+                else {
+                    latestKodkod = null;
+                    if (sol.highLevelCore().a.size()>0)
+                        result.add(tempCNF+".core");
+                    else
+                        result.add("");
+                }
             }
             (new File(tempdir)).delete(); // In case it was UNSAT, or canceled...
             if (result.size()>1) {
-                rep.cb("bold", "" + result.size() + " commands were executed. The results are:\n");
+                latestRep.cb("bold", "" + result.size() + " commands were executed. The results are:\n");
                 for(int i=0; i<result.size(); i++) {
                     Command r=world.getAllCommands().get(i);
-                    if (result.get(i)==null) { rep.cb("", "   #"+(i+1)+": Unknown.\n"); continue; }
+                    if (result.get(i)==null) { latestRep.cb("", "   #"+(i+1)+": Unknown.\n"); continue; }
                     if (result.get(i).endsWith(".xml")) {
-                        rep.cb("", "   #"+(i+1)+": ");
-                        rep.cb("link", r.check?"Counterexample found. ":"Instance found. ", "XML: "+result.get(i));
-                        rep.cb("", r.label+(r.check?" is invalid":" is consistent"));
-                        if (r.expects==0) rep.cb("", ", contrary to expectation");
-                        else if (r.expects==1) rep.cb("", ", as expected");
+                        latestRep.cb("", "   #"+(i+1)+": ");
+                        latestRep.cb("link", r.check?"Counterexample found. ":"Instance found. ", "XML: "+result.get(i));
+                        latestRep.cb("", r.label+(r.check?" is invalid":" is consistent"));
+                        if (r.expects==0) latestRep.cb("", ", contrary to expectation");
+                        else if (r.expects==1) latestRep.cb("", ", as expected");
                     } else if (result.get(i).endsWith(".core")) {
-                        rep.cb("", "   #"+(i+1)+": ");
-                        rep.cb("link", r.check?"No counterexample found. ":"No instance found. ", "CORE: "+result.get(i));
-                        rep.cb("", r.label+(r.check?" may be valid":" may be inconsistent"));
-                        if (r.expects==1) rep.cb("", ", contrary to expectation");
-                        else if (r.expects==0) rep.cb("", ", as expected");
+                        latestRep.cb("", "   #"+(i+1)+": ");
+                        latestRep.cb("link", r.check?"No counterexample found. ":"No instance found. ", "CORE: "+result.get(i));
+                        latestRep.cb("", r.label+(r.check?" may be valid":" may be inconsistent"));
+                        if (r.expects==1) latestRep.cb("", ", contrary to expectation");
+                        else if (r.expects==0) latestRep.cb("", ", as expected");
                     } else {
-                        if (r.check) rep.cb("", "   #"+(i+1)+": No counterexample found. "+r.label+" may be valid");
-                        else rep.cb("", "   #"+(i+1)+": No instance found. "+r.label+" may be inconsistent");
-                        if (r.expects==1) rep.cb("", ", contrary to expectation");
-                        else if (r.expects==0) rep.cb("", ", as expected");
+                        if (r.check) latestRep.cb("", "   #"+(i+1)+": No counterexample found. "+r.label+" may be valid");
+                        else latestRep.cb("", "   #"+(i+1)+": No instance found. "+r.label+" may be inconsistent");
+                        if (r.expects==1) latestRep.cb("", ", contrary to expectation");
+                        else if (r.expects==0) latestRep.cb("", ", as expected");
                     }
-                    rep.cb("", ".\n");
+                    latestRep.cb("", ".\n");
                 }
-                rep.cb("", "\n");
+                latestRep.cb("", "\n");
             }
-            if (rep.warn>1) rep.cb("bold", "Note: There were "+rep.warn+" compilation warnings. Please scroll up to see them.\n");
-            if (rep.warn==1) rep.cb("bold", "Note: There was 1 compilation warning. Please scroll up to see it.\n");
+            if (latestRep.warn>1) latestRep.cb("bold", "Note: There were "+latestRep.warn+" compilation warnings. Please scroll up to see them.\n");
+            if (latestRep.warn==1) latestRep.cb("bold", "Note: There was 1 compilation warning. Please scroll up to see it.\n");
+        }
+    }
+
+    static class LogLink implements Serializable {
+        private static final long serialVersionUID = 140775378800533167L;
+        transient final Object obj;
+        transient final String tempdir;
+        final String label;
+        final String kind;
+        final String href;
+
+        LogLink(String label, Object obj, String tempdir)              { this(label, obj, tempdir, label); }
+        LogLink(String label, Object obj, String tempdir, String kind) {
+            this.obj = obj;
+            this.label = label;
+            this.kind = kind;
+            this.tempdir = tempdir;
+            this.href = _href(latestKodkod);
+        }
+
+        private String _href(A4Solution sol) {
+            if (obj instanceof Formula) {
+                Formula n = (Formula) obj;
+                //n = FullNegationPropagator.toNNF(AnnotatedNode.annotate(n)).node();
+                return A4Preferences.HOLSaveFormulas.get() ? "MSG: " + PrettyPrinter.print(n, 0) : null;
+            } else if (obj instanceof Instance) {
+                InstFormat fmt = InstFormat.NOTHING;
+                if ("candidate".equals(kind) || "instance".equals(kind)) fmt = A4Preferences.HOLSaveCandidates.get();
+                if ("cex".equals(kind)) fmt = A4Preferences.HOLSaveCex.get();
+                if (fmt == InstFormat.VIZ && sol != null) return "XML: " + createAndSaveTmpSolution(sol, (Instance)obj);
+                else if (fmt == InstFormat.TEXT)          return "MSG: " + ((Instance)obj).toPrettyString();
+                else                                      return null;
+            } else if (obj instanceof Bounds) { return A4Preferences.HOLSavePI.get() ? "MSG: " + obj.toString() : null;
+            } else if (obj == null)           {
+                return "MSG: null";
+            } else                            { return "MSG: " + obj.toString(); }
+        }
+
+        private String createAndSaveTmpSolution(A4Solution sol, Instance inst) {
+            String filename = tempdir + File.separatorChar + (kind != null ? kind : "inst") + "_" + (inst_cnt++) + ".xml";
+            try {
+                sol.writeXMLFor(inst, filename);
+                return filename;
+            } catch (Err e) {
+                e.printStackTrace();
+                return null;
+            }
         }
     }
 }

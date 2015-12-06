@@ -15,10 +15,17 @@
 
 package edu.mit.csail.sdg.alloy4viz;
 
+import static edu.mit.csail.sdg.alloy4.Util.encode;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+
+import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.OurTree;
+import edu.mit.csail.sdg.alloy4.Pair;
+import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprHasName;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
@@ -27,11 +34,6 @@ import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Tuple;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4TupleSet;
-import edu.mit.csail.sdg.alloy4.Err;
-import edu.mit.csail.sdg.alloy4.OurTree;
-import edu.mit.csail.sdg.alloy4.Pair;
-import edu.mit.csail.sdg.alloy4.Util;
-import static edu.mit.csail.sdg.alloy4.Util.encode;
 
 /** GUI tree that displays an instance as a tree.
  *

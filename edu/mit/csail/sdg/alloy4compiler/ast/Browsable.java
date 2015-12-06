@@ -20,9 +20,11 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.border.EmptyBorder;
+
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.Listener;
 import edu.mit.csail.sdg.alloy4.OurTree;

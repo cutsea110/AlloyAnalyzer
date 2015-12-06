@@ -16,6 +16,7 @@
 package edu.mit.csail.sdg.alloy4compiler.sim;
 
 import java.util.List;
+
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
 
 /** This interface represents callback objects (that can be plugged into SimContext to perform more efficient evaluations) */

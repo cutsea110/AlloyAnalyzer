@@ -15,13 +15,13 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collections;
-import java.util.Set;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.Iterator;
-import java.io.Serializable;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /** Immutable; implements a set based on hashCode() and equals(); null value is allowed.
  *

@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import kodkod.ast.BinaryExpression;
@@ -42,7 +43,9 @@ import kodkod.ast.BinaryFormula;
 import kodkod.ast.Decl;
 import kodkod.ast.Expression;
 import kodkod.ast.Formula;
+import kodkod.ast.IntConstant;
 import kodkod.ast.IntExpression;
+import kodkod.ast.IntToExprCast;
 import kodkod.ast.Node;
 import kodkod.ast.Relation;
 import kodkod.ast.Variable;
@@ -50,14 +53,18 @@ import kodkod.ast.operator.ExprOperator;
 import kodkod.ast.operator.FormulaOperator;
 import kodkod.engine.CapacityExceededException;
 import kodkod.engine.Evaluator;
+import kodkod.engine.HOLSolver;
+import kodkod.engine.KodkodSolver;
 import kodkod.engine.Proof;
 import kodkod.engine.Solution;
 import kodkod.engine.Solver;
+import kodkod.engine.Statistics;
 import kodkod.engine.config.AbstractReporter;
 import kodkod.engine.config.Options;
 import kodkod.engine.config.Reporter;
 import kodkod.engine.fol2sat.TranslationRecord;
 import kodkod.engine.fol2sat.Translator;
+import kodkod.engine.hol.HOLTranslation;
 import kodkod.engine.satlab.SATFactory;
 import kodkod.engine.ucore.HybridStrategy;
 import kodkod.engine.ucore.RCEStrategy;
@@ -68,14 +75,14 @@ import kodkod.instance.TupleFactory;
 import kodkod.instance.TupleSet;
 import kodkod.instance.Universe;
 import kodkod.util.ints.IndexedEntry;
-import edu.mit.csail.sdg.alloy4.A4Preferences;
-import edu.mit.csail.sdg.alloy4.A4Reporter;
+import kodkod.util.nodes.PrettyPrinter;
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.ConstMap;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorAPI;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
+import edu.mit.csail.sdg.alloy4.IA4Reporter;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
@@ -88,6 +95,7 @@ import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
+import edu.mit.csail.sdg.alloy4compiler.ast.IntScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
@@ -99,7 +107,7 @@ import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
  * Once solve() has been called, then this object becomes immutable after that.
  */
 
-public final class A4Solution {
+public class A4Solution {
 
     //====== static immutable fields ====================================================================//
 
@@ -129,9 +137,6 @@ public final class A4Solution {
     /** The original Alloy command that generated this solution; can be "" if unknown. */
     private final String originalCommand;
 
-    /** The bitwidth; always between 1 and 30. */
-    private final int bitwidth;
-
     /** The maximum allowed sequence length; always between 0 and 2^(bitwidth-1)-1. */
     private final int maxseq;
 
@@ -154,7 +159,10 @@ public final class A4Solution {
     private final TupleSet stringBounds;
 
     /** The Kodkod Solver object. */
-    private final Solver solver;
+    private final KodkodSolver solver;
+
+    /** The last Kodkod solving statistics */
+    private Statistics stats;
 
     //====== mutable fields (immutable after solve() has been called) ===================================//
 
@@ -203,33 +211,56 @@ public final class A4Solution {
     /** The map from each Kodkod Variable to an Alloy Type and Alloy Pos. */
     private Map<Variable,Pair<Type,Pos>> decl2type;
 
+    /** optional partial instance */
+    private final PartialInstance partialInstance;
+    /** whether or not to rename atoms */
+    private boolean renameAtoms = true;
+
+//    /** The bitwidth; always between 1 and 30. */
+//    private final int bitwidth;
+//
+//    /** ints to use in translation */
+//    private final int minInt, maxInt, intInc;
+//    private final List<Integer> ints;
+    private final IntScope intScope;
+
     //===================================================================================================//
 
     /** Construct a blank A4Solution containing just UNIV, SIGINT, SEQIDX, STRING, and NONE as its only known sigs.
      * @param originalCommand  - the original Alloy command that generated this solution; can be "" if unknown
-     * @param bitwidth - the bitwidth; must be between 1 and 30
      * @param maxseq - the maximum allowed sequence length; must be between 0 and (2^(bitwidth-1))-1
      * @param atoms - the set of atoms
      * @param rep - the reporter that will receive diagnostic and progress messages
      * @param opt - the Alloy options that will affect the solution and the solver
      * @param expected - whether the user expected an instance or not (1 means yes, 0 means no, -1 means the user did not express an expectation)
+     * @param pi
      */
-    A4Solution(String originalCommand, int bitwidth, int maxseq, Set<String> stringAtoms, Collection<String> atoms, final A4Reporter rep, A4Options opt, int expected) throws Err {
+    A4Solution(String originalCommand, IntScope intScope, int maxseq, Set<String> stringAtoms, Collection<String> atoms,
+            final IA4Reporter rep, A4Options opt, int expected) throws Err {
+        this(originalCommand, intScope, maxseq, stringAtoms, atoms, rep, opt, expected, null);
+    }
+
+    A4Solution(String originalCommand, IntScope intScope, int maxseq, Set<String> stringAtoms, Collection<String> atoms,
+            final IA4Reporter rep, A4Options opt, int expected, PartialInstance pi) throws Err {
         opt = opt.dup();
+        this.partialInstance = pi != null ? pi : new PartialInstance();
+        this.renameAtoms = opt.renameAtoms;
         this.unrolls = opt.unrolls;
         this.sigs = new SafeList<Sig>(Arrays.asList(UNIV, SIGINT, SEQIDX, STRING, NONE));
-        this.a2k = Util.asMap(new Expr[]{UNIV, SIGINT, SEQIDX, STRING, NONE}, Relation.INTS.union(KK_STRING), Relation.INTS, KK_SEQIDX, KK_STRING, Relation.NONE);
+        this.a2k = Util.asMap(new Expr[]{UNIV, SIGINT, SEQIDX, STRING, NONE},
+                Relation.INTS.union(KK_STRING), Relation.INTS, KK_SEQIDX, KK_STRING, Relation.NONE);
         this.k2pos = new LinkedHashMap<Formula,Object>();
         this.rel2type = new LinkedHashMap<Relation,Type>();
         this.decl2type = new LinkedHashMap<Variable,Pair<Type,Pos>>();
         this.originalOptions = opt;
         this.originalCommand = (originalCommand==null ? "" : originalCommand);
-        this.bitwidth = bitwidth;
         this.maxseq = maxseq;
-        if (bitwidth < 0)   throw new ErrorSyntax("Cannot specify a bitwidth less than 0");
-        if (bitwidth > 30)  throw new ErrorSyntax("Cannot specify a bitwidth greater than 30");
+        this.intScope = intScope;
+        assert this.intScope != null : "no int scope given";
         if (maxseq < 0)     throw new ErrorSyntax("The maximum sequence length cannot be negative.");
-        if (maxseq > 0 && maxseq > max()) throw new ErrorSyntax("With integer bitwidth of "+bitwidth+", you cannot have sequence length longer than "+max());
+        if (maxseq > 0 && maxseq > this.intScope.maxInt())
+            maxseq = 0;
+            //TODO: throw new ErrorSyntax("With integer bitwidth of "+bitwidth+", you cannot have sequence length longer than "+max());
         if (atoms.isEmpty()) {
             atoms = new ArrayList<String>(1);
             atoms.add("<empty>");
@@ -241,17 +272,20 @@ public final class A4Solution {
         TupleSet seqidxBounds = factory.noneOf(1);
         TupleSet stringBounds = factory.noneOf(1);
         final TupleSet next = factory.noneOf(2);
-        int min=min(), max=max();
-        if (max >= min) for(int i=min; i<=max; i++) { // Safe since we know 1 <= bitwidth <= 30
+        int minInt = this.intScope.minInt();
+        int maxInt = this.intScope.maxInt();
+        Integer prevI = null;
+        for(int i : intScope.enumerateAccending()) {
            Tuple ii = factory.tuple(""+i);
            TupleSet is = factory.range(ii, ii);
            bounds.boundExactly(i, is);
            sigintBounds.add(ii);
            if (i>=0 && i<maxseq) seqidxBounds.add(ii);
-           if (i+1<=max) next.add(factory.tuple(""+i, ""+(i+1)));
-           if (i==min) bounds.boundExactly(KK_MIN,  is);
-           if (i==max) bounds.boundExactly(KK_MAX,  is);
-           if (i==0)   bounds.boundExactly(KK_ZERO, is);
+           if (prevI != null) next.add(factory.tuple(""+prevI, ""+i));
+           if (i==minInt) bounds.boundExactly(KK_MIN,  is);
+           if (i==maxInt) bounds.boundExactly(KK_MAX,  is);
+           if (i==0)      bounds.boundExactly(KK_ZERO, is);
+           prevI = i;
         }
         this.sigintBounds = sigintBounds.unmodifiableView();
         this.seqidxBounds = seqidxBounds.unmodifiableView();
@@ -269,7 +303,10 @@ public final class A4Solution {
         this.stringBounds = stringBounds.unmodifiableView();
         bounds.boundExactly(KK_STRING, this.stringBounds);
         int sym = (expected==1 ? 0 : opt.symmetry);
-        solver = new Solver();
+        solver = opt.higherOrderSolver ? HOLSolver.solver() : new Solver();
+        solver.options().setHolSome4AllMaxIter(opt.holMaxIter);
+        solver.options().setHolFixpointMaxIter(opt.holMaxIter);
+        solver.options().setHolFullIncrements(opt.holFullIncrements);
         solver.options().setNoOverflow(opt.noOverflow);
         //solver.options().setFlatten(false); // added for now, since multiplication and division circuit takes forever to flatten
         if (opt.solver.external()!=null) {
@@ -284,7 +321,7 @@ public final class A4Solution {
         } else if (opt.solver.equals(A4Options.SatSolver.LingelingJNI)) {
             solver.options().setSolver(SATFactory.Lingeling);
         } else if (opt.solver.equals(A4Options.SatSolver.PLingelingJNI)) {
-            solver.options().setSolver(SATFactory.plingeling(4, null));
+            solver.options().setSolver(SATFactory.plingeling(opt.solverThreads, !opt.solverThreadsShareClauses));
         } else if (opt.solver.equals(A4Options.SatSolver.GlucoseJNI)) {
             solver.options().setSolver(SATFactory.Glucose);
         } else if (opt.solver.equals(A4Options.SatSolver.CryptoMiniSatJNI)) {
@@ -301,20 +338,39 @@ public final class A4Solution {
         }
         solver.options().setSymmetryBreaking(sym);
         solver.options().setSkolemDepth(opt.skolemDepth);
+        int bitwidth = this.intScope.bitwidth();
         solver.options().setBitwidth(bitwidth > 0 ? bitwidth : (int) Math.ceil(Math.log(atoms.size())) + 1);
         solver.options().setIntEncoding(Options.IntEncoding.TWOSCOMPLEMENT);
+//        solver.options().setOverflowBitwidth(intScope.ofBw);
+        if (opt.higherOrderSolver) {
+            solver.options().setAllowHOL(opt.higherOrderSolver);
+            solver.options().setLogTranslation(0);
+            solver.options().setSkolemDepth(0);
+        }
      }
 
+    private static Expression intExpr(int i) {
+        return IntConstant.constant(i).toExpression();
+    }
+
     /** Construct a new A4Solution that is the continuation of the old one, but with the "next" instance. */
-    private A4Solution(A4Solution old) throws Err {
+    static A4Solution makeForNext(A4Solution old) throws Err {
         if (!old.solved) throw new ErrorAPI("This solution is not yet solved, so next() is not allowed.");
         if (old.kEnumerator==null) throw new ErrorAPI("This solution was not generated by an incremental SAT solver.\n" + "Solution enumeration is currently only implemented for MiniSat and SAT4J.");
         if (old.eval==null) throw new ErrorAPI("This solution is already unsatisfiable, so you cannot call next() to get the next solution.");
-        Instance inst = old.kEnumerator.next().instance();
+        return new A4Solution(old, old.kEnumerator.next().instance());
+    }
+
+    private A4Solution makeForNext() throws Err { return A4Solution.makeForNext(this); }
+
+    /** Construct a new A4Solution that is the continuation of the old one, but with the given instance. */
+    private A4Solution(A4Solution old, Instance inst) throws Err {
         unrolls = old.unrolls;
+        partialInstance = old.partialInstance;
+        renameAtoms = old.renameAtoms;
         originalOptions = old.originalOptions;
         originalCommand = old.originalCommand;
-        bitwidth = old.bitwidth;
+        intScope = old.intScope;
         maxseq = old.maxseq;
         kAtoms = old.kAtoms;
         factory = old.factory;
@@ -322,6 +378,7 @@ public final class A4Solution {
         seqidxBounds = old.seqidxBounds;
         stringBounds = old.stringBounds;
         solver = old.solver;
+        stats = old.stats;
         bounds = old.bounds;
         formulas = old.formulas;
         sigs = old.sigs;
@@ -368,17 +425,22 @@ public final class A4Solution {
 
     //===================================================================================================//
 
-    /** Returns the bitwidth; always between 1 and 30. */
-    public int getBitwidth() { return bitwidth; }
+    /** Returns the partial instance to be used when constructing bounds */
+    public PartialInstance partialInstance() { return this.partialInstance; }
+    /** Returns the value of the 'renameAtoms' option */
+    public boolean renameAtoms()             { return this.renameAtoms; }
+    public boolean createAtomRelations()     { return originalOptions.higherOrderSolver; }
+    public boolean isNoOverflow()            { return originalOptions.noOverflow; }
+
+    //===================================================================================================//
+
+    /** Returns the bitwidth */
+    public int getBitwidth() throws ErrorFatal { return intScope.bitwidth(); }
 
     /** Returns the maximum allowed sequence length; always between 0 and 2^(bitwidth-1)-1. */
     public int getMaxSeq() { return maxseq; }
 
-    /** Returns the largest allowed integer, or -1 if no integers are allowed. */
-    public int max() { return Util.max(bitwidth); }
-
-    /** Returns the smallest allowed integer, or 0 if no integers are allowed */
-    public int min() { return Util.min(bitwidth); }
+    public IntScope intScope() { return intScope; }
 
     /** Returns the maximum number of allowed loop unrolling or recursion level. */
     public int unrolls() { return unrolls; }
@@ -396,9 +458,9 @@ public final class A4Solution {
     /** Returns the Kodkod input used to generate this solution; returns "" if unknown. */
     public String debugExtractKInput() {
        if (solved)
-          return TranslateKodkodToJava.convert(Formula.and(formulas), bitwidth, kAtoms, bounds, atom2name);
+          return TranslateKodkodToJava.convert(Formula.and(formulas), intScope.bitwidth, kAtoms, bounds, atom2name);
        else
-          return TranslateKodkodToJava.convert(Formula.and(formulas), bitwidth, kAtoms, bounds.unmodifiableView(), null);
+          return TranslateKodkodToJava.convert(Formula.and(formulas), intScope.bitwidth, kAtoms, bounds.unmodifiableView(), null);
     }
 
     //===================================================================================================//
@@ -407,16 +469,27 @@ public final class A4Solution {
     TupleFactory getFactory() { return factory; }
 
     /** Returns a modifiable copy of the Kodkod Bounds object. */
-    Bounds getBounds() { return bounds.clone(); }
+    public Bounds getBounds() { return bounds.clone(); }
+
+    public Statistics getStats()   { return stats; }
+
+    public Map<String, Pair<TupleSet, TupleSet>> getBoundsSer() {
+        Map<String, Pair<TupleSet, TupleSet>> ans = new HashMap<String, Pair<TupleSet,TupleSet>>();
+        for (Entry<Relation, TupleSet> e : bounds.upperBounds().entrySet()) {
+            ans.put(e.getKey().toString(), new Pair<TupleSet, TupleSet>(bounds.lowerBound(e.getKey()), e.getValue()));
+        }
+        return ans;
+    }
 
     /** Add a new relation with the given label and the given lower and upper bound.
      * @param label - the label for the new relation; need not be unique
      * @param lower - the lowerbound; can be null if you want it to be the empty set
      * @param upper - the upperbound; cannot be null; must contain everything in lowerbound
      */
-    Relation addRel(String label, TupleSet lower, TupleSet upper) throws ErrorFatal {
+    Relation addRel(String label, TupleSet lower, TupleSet upper, boolean isAtom) throws ErrorFatal {
        if (solved) throw new ErrorFatal("Cannot add a Kodkod relation since solve() has completed.");
-       Relation rel = Relation.nary(label, upper.arity());
+       Relation rel = isAtom ? Relation.atom(label) : Relation.nary(label, upper.arity());
+       assert bounds.upperBound(rel) == null : "bound already given for relation " + rel;
        if (lower == upper) {
           bounds.boundExactly(rel, upper);
        } else if (lower == null) {
@@ -485,10 +558,19 @@ public final class A4Solution {
     Expression a2k(String stringConstant)  { return s2k.get(stringConstant); }
 
     /** Returns the corresponding Kodkod expression for the given expression, or null if it is not associated with anything. */
-    Expression a2k(Expr expr) throws ErrorFatal {
+    Expression a2k(Expr expr) throws ErrorFatal { return a2k(expr, false); }
+    Expression a2k(Expr expr, boolean ignoreMultiplicities) throws ErrorFatal {
+        if (expr == null) return null;
         while(expr instanceof ExprUnary) {
-            if (((ExprUnary)expr).op==ExprUnary.Op.NOOP) { expr = ((ExprUnary)expr).sub; continue; }
-            if (((ExprUnary)expr).op==ExprUnary.Op.EXACTLYOF) { expr = ((ExprUnary)expr).sub; continue; }
+            ExprUnary exprUnary = (ExprUnary)expr;
+            if (exprUnary.op==ExprUnary.Op.NOOP) { expr = exprUnary.sub; continue; }
+            if (exprUnary.op==ExprUnary.Op.EXACTLYOF) { expr = exprUnary.sub; continue; }
+            if (ignoreMultiplicities) {
+                if (exprUnary.op==ExprUnary.Op.ONEOF ||
+                    exprUnary.op==ExprUnary.Op.SOMEOF ||
+                    exprUnary.op==ExprUnary.Op.LONEOF ||
+                    exprUnary.op==ExprUnary.Op.SETOF) { expr = exprUnary.sub; continue; }
+            }
             break;
         }
         if (expr instanceof ExprConstant && ((ExprConstant)expr).op==ExprConstant.Op.EMPTYNESS) return Expression.NONE;
@@ -501,6 +583,7 @@ public final class A4Solution {
               case PLUS: return a2k(a).union(a2k(b));
               case MINUS: return a2k(a).difference(a2k(b));
               //TODO: IPLUS, IMINUS???
+              default: break;
             }
         }
         return null; // Current only UNION, PRODUCT, and DIFFERENCE of Sigs and Fields and ExprConstant.EMPTYNESS are allowed in a defined field's definition.
@@ -517,6 +600,8 @@ public final class A4Solution {
        if (expr==Relation.INTS) return makeMutable ? sigintBounds.clone() : sigintBounds;
        if (expr==KK_SEQIDX) return makeMutable ? seqidxBounds.clone() : seqidxBounds;
        if (expr==KK_STRING) return makeMutable ? stringBounds.clone() : stringBounds;
+
+       IntExpression ic;
        if (expr instanceof Relation) {
           TupleSet ans = findUpper ? bounds.upperBound((Relation)expr) : bounds.lowerBound((Relation)expr);
           if (ans!=null) return makeMutable ? ans.clone() : ans;
@@ -533,6 +618,11 @@ public final class A4Solution {
               TupleSet right = query(findUpper, b.right(), false);
               return left.product(right);
           }
+       }
+       else if (expr instanceof IntToExprCast && (ic=((IntToExprCast)expr).intExpr()) instanceof IntConstant) {
+          String val = "" + ((IntConstant)ic).value();
+          Universe univ = bounds.universe();
+          return univ.contains(val) ? univ.factory().setOf(val) : univ.factory().noneOf(1);
        }
        throw new ErrorFatal("Unknown expression encountered during bounds computation: "+expr);
     }
@@ -567,7 +657,7 @@ public final class A4Solution {
     String atom2name(Object atom) { String ans=atom2name.get(atom); return ans==null ? atom.toString() : ans; }
 
     /** Returns the most specific sig corresponding to the given atom if the problem is solved and is satisfiable; else returns UNIV. */
-    PrimSig atom2sig(Object atom) { PrimSig sig=atom2sig.get(atom); return sig==null ? UNIV : sig; }
+    public PrimSig atom2sig(Object atom) { PrimSig sig=atom2sig.get(atom); return sig==null ? UNIV : sig; }
 
     /** Caches eval(Sig) and eval(Field) results. */
     private Map<Expr,A4TupleSet> evalCache = new LinkedHashMap<Expr,A4TupleSet>();
@@ -612,9 +702,9 @@ public final class A4Solution {
            if (expr.ambiguous && !expr.errors.isEmpty()) expr = expr.resolve(expr.type(), null);
            if (!expr.errors.isEmpty()) throw expr.errors.pick();
            Object result = TranslateAlloyToKodkod.alloy2kodkod(this, expr);
-           if (result instanceof IntExpression) return eval.evaluate((IntExpression)result) + (eval.wasOverflow() ? " (OF)" : "");
+           if (result instanceof IntExpression) return eval.evaluate((IntExpression)result) + (eval.wasOverflow() ? " (overflows)" : "");
            if (result instanceof Formula) return eval.evaluate((Formula)result);
-           if (result instanceof Expression) return new A4TupleSet(eval.evaluate((Expression)result), this);
+           if (result instanceof Expression) return new A4TupleSet(eval.evaluate((Expression)result), this, eval.wasOverflow());
            throw new ErrorFatal("Unknown internal error encountered in the evaluator.");
         } catch(CapacityExceededException ex) {
            throw TranslateAlloyToKodkod.rethrow(ex);
@@ -856,13 +946,13 @@ public final class A4Solution {
         int i = 0;
         for(Tuple t: list) {
            if (frame.atom2sig.containsKey(t.atom(0))) continue; // This means one of the subsig has already claimed this atom.
-           String x = signame + "$" + i;
+           String x = frame.renameAtoms ? signame + "$" + i : t.atom(0).toString();
            i++;
            frame.atom2sig.put(t.atom(0), s);
            frame.atom2name.put(t.atom(0), x);
            ExprVar v = ExprVar.make(null, x, s.type());
            TupleSet ts = t.universe().factory().range(t, t);
-           Relation r = Relation.unary(x);
+           Relation r = s.isAtom != null ? Relation.atom(x) : Relation.unary(x);
            frame.eval.instance().add(r, ts);
            frame.a2k.put(v, r);
            frame.atoms.add(v);
@@ -871,14 +961,16 @@ public final class A4Solution {
 
     //===================================================================================================//
 
+    private A4Solution i2a(Instance inst) { try { return new A4Solution(this, inst); } catch (Err e) { return null; } }
+
     /** Solve for the solution if not solved already; if cmd==null, we will simply use the lowerbound of each relation as its value. */
-    A4Solution solve(final A4Reporter rep, Command cmd, Simplifier simp, boolean tryBookExamples) throws Err, IOException {
+    A4Solution solve(final IA4Reporter rep, Command cmd, Simplifier simp, boolean tryBookExamples) throws Err, IOException {
         // If already solved, then return this object as is
         if (solved) return this;
         // If cmd==null, then all four arguments are ignored, and we simply use the lower bound of each relation
         if (cmd==null) {
            Instance inst = new Instance(bounds.universe());
-           for(int max=max(), i=min(); i<=max; i++) {
+           for(int i : intScope.enumerateAccending()) {
               Tuple it = factory.tuple(""+i);
               inst.add(i, factory.range(it, it));
            }
@@ -892,10 +984,10 @@ public final class A4Solution {
         final A4Options opt = originalOptions;
         long time = System.currentTimeMillis();
         rep.debug("Simplifying the bounds...\n");
-        if (opt.inferPartialInstance && simp!=null && formulas.size()>0 && !simp.simplify(rep, this, formulas)) addFormula(Formula.FALSE, Pos.UNKNOWN);
-        rep.translate(opt.solver.id(), bitwidth, maxseq, solver.options().skolemDepth(), solver.options().symmetryBreaking());
+        if (simp!=null && formulas.size()>0 && !simp.simplify(rep, this, formulas)) addFormula(Formula.FALSE, Pos.UNKNOWN);
+        rep.translate(opt.solver.id(), intScope.bitwidth(), maxseq, solver.options().skolemDepth(), solver.options().symmetryBreaking());
         Formula fgoal = Formula.and(formulas);
-        rep.debug("Generating the solution...\n");
+
         kEnumerator = null;
         Solution sol = null;
         final Reporter oldReporter = solver.options().reporter();
@@ -917,14 +1009,32 @@ public final class A4Solution {
                if (solved[0]) return; else solved[0]=true; // initially solved[0] is true, so we won't report the # of vars/clauses
                if (rep!=null) rep.solve(primaryVars, vars, clauses);
            }
+           public void holLoopStart(HOLTranslation tr, Formula f, Bounds b)                      { rep.holLoopStart(tr, f, b); }
+           public void holCandidateFound(HOLTranslation tr, Instance c)                          { if (opt.convertHolInst2A4Sol) rep.holCandidateFound(tr, i2a(c)); else rep.holCandidateFound(tr, c); }
+           public void holVerifyingCandidate(HOLTranslation tr, Instance c, Formula f, Bounds b) { if (opt.convertHolInst2A4Sol) rep.holVerifyingCandidate(tr, i2a(c), f, b); else rep.holVerifyingCandidate(tr, c, f, b); }
+           public void holCandidateVerified(HOLTranslation tr, Instance c)                       { if (opt.convertHolInst2A4Sol) rep.holCandidateVerified(tr, i2a(c)); else rep.holCandidateVerified(tr, c); }
+           public void holCandidateNotVerified(HOLTranslation tr, Instance c, Instance cex)      { if (opt.convertHolInst2A4Sol) rep.holCandidateNotVerified(tr, i2a(c), i2a(cex)); else rep.holCandidateNotVerified(tr, c, cex); }
+           public void holFindingNextCandidate(HOLTranslation tr, Formula inc)                   { rep.holFindingNextCandidate(tr, inc); }
+           public void holSplitStart(HOLTranslation tr, Formula formula)                         { rep.holSplitStart(tr, formula); }
+           public void holSplitChoice(HOLTranslation tr, Formula formula, Bounds bounds)         { rep.holSplitChoice(tr, formula, bounds); }
+           public void holSplitChoiceSAT(HOLTranslation tr, Instance inst)                       { if (opt.convertHolInst2A4Sol) rep.holSplitChoiceSAT(tr, i2a(inst)); else rep.holSplitChoiceSAT(tr, inst);}
+           public void holSplitChoiceUNSAT(HOLTranslation tr)                                    { rep.holSplitChoiceUNSAT(tr); }
+           public void holFixpointStart(HOLTranslation tr, Formula formula, Bounds bounds)       { rep.holFixpointStart(tr, formula, bounds); }
+           public void holFixpointNoSolution(HOLTranslation tr)                                  { rep.holFixpointNoSolution(tr); }
+           public void holFixpointFirstSolution(HOLTranslation tr, Instance candidate)           { if (opt.convertHolInst2A4Sol) rep.holFixpointFirstSolution(tr, i2a(candidate)); else rep.holFixpointFirstSolution(tr, candidate); }
+           public void holFixpointIncrementing(HOLTranslation tr, Formula inc)                   { rep.holFixpointIncrementing(tr, inc); }
+           public void holFixpointIncrementingOutcome(HOLTranslation tr, Instance next)          { if (opt.convertHolInst2A4Sol) rep.holFixpointIncrementingOutcome(tr, i2a(next)); else rep.holFixpointIncrementingOutcome(tr, next); }
         });
         if (!opt.solver.equals(SatSolver.CNF) && !opt.solver.equals(SatSolver.KK) && tryBookExamples) { // try book examples
-           A4Reporter r = "yes".equals(System.getProperty("debug")) ? rep : null;
-           try { sol = BookExamples.trial(r, this, fgoal, solver, cmd.check); } catch(Throwable ex) { sol = null; }
+           IA4Reporter r = Util.isDebug() ? rep : null;
+           try { sol = BookExamples.trial(r, this, fgoal, (Solver) solver, cmd.check); } catch(Throwable ex) { sol = null; }
         }
         solved[0] = false; // this allows the reporter to report the # of vars/clauses
-        for(Relation r: bounds.relations()) { formulas.add(r.eq(r)); } // Without this, kodkod refuses to grow unmentioned relations
+        for(Relation r: bounds.relations()) if (!r.isAtom()) formulas.add(r.eq(r)); // Without this, kodkod refuses to grow unmentioned relations
         fgoal = Formula.and(formulas);
+
+        rep.generatingSolution(fgoal, bounds);
+
         // Now pick the solver and solve it!
         if (opt.solver.equals(SatSolver.KK)) {
             File tmpCNF = File.createTempFile("tmp", ".java", new File(opt.tempDirectory));
@@ -932,7 +1042,7 @@ public final class A4Solution {
             Util.writeAll(out, debugExtractKInput());
             rep.resultCNF(out);
             return null;
-         }
+        }
         if (opt.solver.equals(SatSolver.CNF)) {
             File tmpCNF = File.createTempFile("tmp", ".cnf", new File(opt.tempDirectory));
             String out = tmpCNF.getAbsolutePath();
@@ -943,7 +1053,7 @@ public final class A4Solution {
             Util.writeAll(out, sol.instance()!=null ? "p cnf 1 1\n1 0\n" : "p cnf 1 2\n1 0\n-1 0\n");
             rep.resultCNF(out);
             return null;
-         }
+        }
         if (!solver.options().solver().incremental() /* || solver.options().solver()==SATFactory.ZChaffMincost */) {
            if (sol==null) sol = solver.solve(fgoal, bounds);
         } else {
@@ -951,6 +1061,7 @@ public final class A4Solution {
            if (sol==null) sol = kEnumerator.next();
         }
         if (!solved[0]) rep.solve(0, 0, 0);
+        this.stats = sol.stats();
         final Instance inst = sol.instance();
         // To ensure no more output during SolutionEnumeration
         solver.options().setReporter(oldReporter);
@@ -974,6 +1085,7 @@ public final class A4Solution {
               Map<Formula,Node> map = p.highLevelCore();
               hCore = new LinkedHashSet<Node>(map.keySet());
               hCore.addAll(map.values());
+              System.out.println("---------");for (Node c: hCore) System.out.println(PrettyPrinter.print(c, 0) + "\n"); System.out.println("--------");
            } catch(Throwable ex) {
               lCore = hCore = null;
            }
@@ -1037,7 +1149,7 @@ public final class A4Solution {
     public A4Solution next() throws Err {
         if (!solved) throw new ErrorAPI("This solution is not yet solved, so next() is not allowed.");
         if (eval==null) return this;
-        if (nextCache==null) nextCache=new A4Solution(this);
+        if (nextCache==null) nextCache = makeForNext();
         return nextCache;
     }
 
@@ -1117,7 +1229,7 @@ public final class A4Solution {
     }
 
     /** Helper method to write out a full XML file. */
-    public void writeXML(A4Reporter rep, String filename, Iterable<Func> macros, Map<String,String> sourceFiles) throws Err {
+    public void writeXML(IA4Reporter rep, String filename, Iterable<Func> macros, Map<String,String> sourceFiles) throws Err {
         PrintWriter out=null;
         try {
             out=new PrintWriter(filename,"UTF-8");
@@ -1136,8 +1248,23 @@ public final class A4Solution {
     }
 
     /** Helper method to write out a full XML file. */
-    public void writeXML(A4Reporter rep, PrintWriter writer, Iterable<Func> macros, Map<String,String> sourceFiles) throws Err {
+    public void writeXML(IA4Reporter rep, PrintWriter writer, Iterable<Func> macros, Map<String,String> sourceFiles) throws Err {
         A4SolutionWriter.writeInstance(rep, this, writer, macros, sourceFiles);
         if (writer.checkError()) throw new ErrorFatal("Error writing the solution XML file.");
+    }
+
+    public void writeXMLFor(final Instance inst, /* final Bounds bounds, */ String filename) throws Err {
+//        A4Solution sol = new A4Solution(this, inst) {
+//            @Override
+//            public Bounds getBounds() {
+//                return bounds;
+//            }
+//            @Override
+//            public Iterable<ExprVar> getAllSkolems() {
+//                return super.getAllSkolems();
+//            }
+//        };
+        A4Solution sol = new A4Solution(this, inst);
+        sol.writeXML(filename);
     }
 }

@@ -22,6 +22,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.util.IdentityHashMap;
 import java.util.List;
+
 import javax.swing.JLabel;
 import javax.swing.JTree;
 import javax.swing.UIManager;
@@ -33,7 +34,6 @@ import javax.swing.tree.TreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
-import edu.mit.csail.sdg.alloy4.OurUtil;
 
 /** Graphical tree.
  *

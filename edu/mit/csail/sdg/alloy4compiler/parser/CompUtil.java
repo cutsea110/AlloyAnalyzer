@@ -24,11 +24,14 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.ConstList;
@@ -38,15 +41,25 @@ import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.Util;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
+import edu.mit.csail.sdg.alloy4compiler.ast.Decl;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprBinary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprCall;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprFix;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprITE;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprQt;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary.Op;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Module;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.VisitQuery;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary.Op;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Type.ProductType;
+import edu.mit.csail.sdg.alloy4compiler.ast.VisitQuery;
+import edu.mit.csail.sdg.alloy4compiler.ast.VisitReturn;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompModule.Open;
 
 /** This class provides convenience methods for calling the parser and the compiler. */
@@ -147,6 +160,48 @@ public final class CompUtil {
         } catch (Err e) {}
 
         return false;
+    }
+
+    public static Collection<Integer> extractIntLiterals(Iterable<Sig> sigs, Command cmd) {
+        final TreeSet<Integer> ans = new TreeSet<Integer>();
+        extractIntLiterals(cmd.formula, ans);
+        for (Sig s : sigs) for (Expr e : s.getFacts()) extractIntLiterals(e, ans);
+        return ans;
+    }
+    
+    private static void extractIntLiterals(Expr expr, final Set<Integer> lits) {
+        try {
+            final Set<String> stackFrame = new HashSet<String>();
+            expr.accept(new VisitReturn<Void>() {
+                public Void visit(ExprBinary x) throws Err { x.left.accept(this); x.right.accept(this); return null; }
+                public Void visit(ExprList x) throws Err { for (Expr e: x.args) e.accept(this); return null; }
+                public Void visit(ExprCall x) throws Err {
+                    String key = x.fun.label;
+                    if (stackFrame.contains(key)) return null;
+                    stackFrame.add(key);
+                    try {
+                      for (Expr a : x.args) a.accept(this); x.fun.getBody().accept(this); return null;
+                    } finally {
+                        stackFrame.remove(key);
+                    }
+                }                
+                public Void visit(ExprConstant x) throws Err {
+                    if (x.op == edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant.Op.NUMBER) lits.add(x.num);
+                    return null;
+                }
+
+                public Void visit(ExprITE x)   throws Err { x.cond.accept(this); x.left.accept(this); x.right.accept(this); return null; }
+                public Void visit(ExprLet x)   throws Err { x.expr.accept(this); x.sub.accept(this); return null; }
+                public Void visit(ExprQt x)    throws Err { for (Decl d : x.decls) d.expr.accept(this); x.dom.accept(this); x.sub.accept(this); return null; }
+                public Void visit(ExprUnary x) throws Err { x.sub.accept(this); return null; }
+                public Void visit(ExprVar x)   throws Err { return null; }
+                public Void visit(Sig x)       throws Err { return null; } 
+                public Void visit(Field x)     throws Err { return null; }
+                public Void visit(ExprFix x)   throws Err { x.cond.accept(this); x.formula.accept(this); return null; }
+            });
+        } catch (Err e) {
+            e.printStackTrace();
+        }
     }
 
     //=============================================================================================================//
@@ -358,4 +413,5 @@ public final class CompUtil {
                 bos.close();
         }
     }
+
 }

@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.TreeSet;
+
 import javax.swing.Icon;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+
 import edu.mit.csail.sdg.alloy4.ConstSet;
 import edu.mit.csail.sdg.alloy4.MailBug;
 import edu.mit.csail.sdg.alloy4.OurCheckbox;
@@ -269,7 +271,7 @@ public final class VizState {
    /*============================================================================================*/
 
    /** Whether to use the original atom names. */
-   private boolean useOriginalNames = false;
+   private boolean useOriginalNames = true;
 
    /** Returns whether we will use original atom names. */
    public boolean useOriginalName() { return useOriginalNames; }

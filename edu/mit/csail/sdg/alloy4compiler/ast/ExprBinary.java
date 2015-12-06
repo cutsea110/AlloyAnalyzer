@@ -172,6 +172,13 @@ public final class ExprBinary extends Expr {
       /** multiply        */  MUL("*",false),
       /** divide          */  DIV("/",false),
       /** remainder       */  REM("%",false),
+      /** bitwise equal   */  BVEQ("bveq",false),
+      /** bitwise and     */  BVAND("bvand",false),
+      /** bitwise or      */  BVOR("bvor",false),
+      /** bitwise xor     */  BVXOR("bvxor",false),
+      /** bitwise shl     */  BVSHL("bvshl",false),
+      /** bitwise shr     */  BVSHR("bvshr",false),
+      /** bitwise sha     */  BVSHA("bvsha",false),      
       /** =               */  EQUALS("=",false),
       /** !=              */  NOT_EQUALS("!=",false),
       /** =&gt;           */  IMPLIES("=>",false),
@@ -240,6 +247,11 @@ public final class ExprBinary extends Expr {
                right = right.typecheck_as_int();
                break;
            }
+           case BVEQ: case BVAND: case BVOR: case BVXOR: case BVSHL: case BVSHR: case BVSHA: {
+               left = left.typecheck_as_int();
+               right = right.typecheck_as_int();
+               break;
+           }
            case PLUS: case MINUS: case EQUALS: case NOT_EQUALS: {
                //[AM]: these are always relational operators now, so no casts
 //              Type a=left.type, b=right.type;
@@ -274,10 +286,10 @@ public final class ExprBinary extends Expr {
               type = left.type.unionWithCommonArity(right.type);
               if (type==EMPTY) e=error(pos, "++ can be used only between two expressions of the same arity.", left, right);
               break;
-           case PLUS: case MINUS: case EQUALS: case NOT_EQUALS: 
+           case PLUS: case MINUS: case EQUALS: case NOT_EQUALS:
               if (this==EQUALS || this==NOT_EQUALS) {
                  if (left.type.hasCommonArity(right.type) || (left.type.is_int() && right.type.is_int())) {
-                     type=Type.FORMULA; 
+                     type=Type.FORMULA;
                      break;
                  }
               } else {
@@ -288,6 +300,12 @@ public final class ExprBinary extends Expr {
               break;
            case IPLUS: case IMINUS:
                type = Type.smallIntType();
+               break;
+           case BVAND: case BVOR: case BVXOR: case BVSHL: case BVSHR: case BVSHA: 
+               type = Type.smallIntType();
+               break;
+           case BVEQ: 
+               type = Type.FORMULA;
                break;
            case IN: case NOT_IN:
               type=(left.type.hasCommonArity(right.type)) ? Type.FORMULA : EMPTY;
@@ -351,7 +369,7 @@ public final class ExprBinary extends Expr {
            //[AM]
 //           if (left.type.is_int() && right.type.is_int()) {
 //              a=Type.makeInt(a); b=Type.makeInt(b);
-//           } else 
+//           } else
            if (warns==null) {
               break;
            } else if (left.type.hasTuple() && right.type.hasTuple() && !(left.type.intersects(right.type))) {
@@ -384,7 +402,7 @@ public final class ExprBinary extends Expr {
            break;
         }
         case IPLUS: case IMINUS: {
-            a = Type.smallIntType(); 
+            a = Type.smallIntType();
             b = Type.smallIntType();
             break;
         }
@@ -408,7 +426,7 @@ public final class ExprBinary extends Expr {
            //[AM]
 //           if (p.is_int()) {
 //              a=Type.makeInt(a); b=Type.makeInt(b);
-//           } else 
+//           } else
            if (warns!=null && (type.hasNoTuple() || b.hasNoTuple())) {
               w=warn("- is irrelevant since the right expression is redundant.", p);
            }

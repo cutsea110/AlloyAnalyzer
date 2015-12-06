@@ -15,17 +15,104 @@
 
 package edu.mit.csail.sdg.alloy4compiler.parser;
 
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ALL;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ALL2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ANY_ARROW_LONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ANY_ARROW_ONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ANY_ARROW_SOME;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ARROW;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVAND;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVEQ;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVNOT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVNEG;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVOR;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVSHA;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVSHL;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVSHR;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.BVXOR;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.CHECK;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.COLON;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.COMMA;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.DISJ;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.EOF;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.EQUALS;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.EXH;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.FUN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.GT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.GTE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ID;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.IDEN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.IN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTADD;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTDIV;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTMAX;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTMIN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTMUL;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTNEXT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTREM;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.INTSUB;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LBRACE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE_ARROW_ANY;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE_ARROW_LONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE_ARROW_ONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LONE_ARROW_SOME;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.LTE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.MINUS;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NO;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NO2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTEQUALS;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTGT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTGTE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTIN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTLT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NOTLTE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.NUMBER;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE_ARROW_ANY;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE_ARROW_LONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE_ARROW_ONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.ONE_ARROW_SOME;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.PART;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.PRED;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.PRIVATE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.RBRACE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.RBRACKET;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.RPAREN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.RUN;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SET;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SIGINT;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SLASH;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME_ARROW_ANY;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME_ARROW_LONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME_ARROW_ONE;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SOME_ARROW_SOME;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.STR;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SUM;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.SUM2;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.THIS;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.TOTALORDER;
+import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.UNIV;
+
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.io.Reader;
+
 import java_cup.runtime.Scanner;
 import java_cup.runtime.Symbol;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprConstant;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
-import static edu.mit.csail.sdg.alloy4compiler.parser.CompSym.*;
 
 /** This class sits between the lexer and the parser.
  *
@@ -168,6 +255,16 @@ final class CompFilter implements Scanner {
                if (z.sym==ID && ((ExprVar)(z.value)).label.equals("min"))   return merge(x, z, INTMIN);
                if (z.sym==ID && ((ExprVar)(z.value)).label.equals("max"))   return merge(x, z, INTMAX);
                if (z.sym==ID && ((ExprVar)(z.value)).label.equals("next"))  return merge(x, z, INTNEXT);
+
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvand")) return merge(x, z, BVAND);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvnot")) return merge(x, z, BVNOT);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvneg")) return merge(x, z, BVNEG);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvor"))  return merge(x, z, BVOR);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bveq"))  return merge(x, z, BVEQ);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvxor")) return merge(x, z, BVXOR);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvshl")) return merge(x, z, BVSHL);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvshr")) return merge(x, z, BVSHR);
+               if (z.sym==ID && ((ExprVar)(z.value)).label.equals("bvsha")) return merge(x, z, BVSHA);
             } else if (x.sym==ONE) {
                Symbol y = A.next_token();
                if (y.sym!=ARROW) { undo=y; return x; }

@@ -15,6 +15,10 @@
 
 package edu.mit.csail.sdg.alloy4;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+
 /** Immutable; this is the abstract parent class of the various possible errors. */
 
 public abstract class Err extends Exception {
@@ -33,13 +37,23 @@ public abstract class Err extends Exception {
     * @param msg - the actual error message (can be null)
     * @param cause - if nonnull, it will be recorded as the cause of this exception
     */
-   Err(Pos pos, String msg, Throwable cause) {
-      super((msg==null ? "" : msg), cause);
+   public Err(Pos pos, String msg, Throwable cause) {
+      super((msg==null ? "" : msg), (Util.isDebug() || isSerializable(cause)) ? cause : null);
       this.pos = (pos==null ? Pos.UNKNOWN : pos);
       this.msg = (msg==null ? "" : msg);
    }
 
-   /** Two Err objects are equal if the type, position, and message are the same. */
+   private static boolean isSerializable(Throwable cause) {
+      try {
+         ObjectOutputStream oos = new ObjectOutputStream(new ByteArrayOutputStream());
+         oos.writeObject(cause);
+         return true;
+      } catch (IOException e) {
+         return false;
+      }
+   }
+
+/** Two Err objects are equal if the type, position, and message are the same. */
    @Override public final boolean equals(Object other) {
       if (this==other) return true; else if (other==null || getClass()!=other.getClass()) return false;
       Err that = (Err) other;

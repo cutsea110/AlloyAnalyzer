@@ -20,7 +20,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.swing.Icon;
+
 import edu.mit.csail.sdg.alloy4.OurUtil;
 
 /** Immutable; this defines the set of possible colors.

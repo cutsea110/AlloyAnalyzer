@@ -15,32 +15,34 @@
 
 package edu.mit.csail.sdg.alloy4viz;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import edu.mit.csail.sdg.alloy4.ConstList;
-import edu.mit.csail.sdg.alloy4.Util;
-import edu.mit.csail.sdg.alloy4.ConstList.TempList;
-import edu.mit.csail.sdg.alloy4graph.DotColor;
-import edu.mit.csail.sdg.alloy4graph.DotPalette;
-import edu.mit.csail.sdg.alloy4graph.DotShape;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.BOX;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.DIAMOND;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.TRAPEZOID;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.HOUSE;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.ELLIPSE;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.DOUBLE_OCTAGON;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.EGG;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.ELLIPSE;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.HEXAGON;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.OCTAGON;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.HOUSE;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.INV_HOUSE;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.INV_TRAPEZOID;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.INV_TRIANGLE;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.DOUBLE_OCTAGON;
-import static edu.mit.csail.sdg.alloy4graph.DotShape.TRIPLE_OCTAGON;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.M_CIRCLE;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.M_DIAMOND;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.M_SQUARE;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.OCTAGON;
 import static edu.mit.csail.sdg.alloy4graph.DotShape.PARALLELOGRAM;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.TRAPEZOID;
+import static edu.mit.csail.sdg.alloy4graph.DotShape.TRIPLE_OCTAGON;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import edu.mit.csail.sdg.alloy4.ConstList;
+import edu.mit.csail.sdg.alloy4.ConstList.TempList;
+import edu.mit.csail.sdg.alloy4.Util;
+import edu.mit.csail.sdg.alloy4graph.DotColor;
+import edu.mit.csail.sdg.alloy4graph.DotPalette;
+import edu.mit.csail.sdg.alloy4graph.DotShape;
 import edu.mit.csail.sdg.alloy4graph.DotStyle;
 
 /** This class implements the automatic visualization inference.

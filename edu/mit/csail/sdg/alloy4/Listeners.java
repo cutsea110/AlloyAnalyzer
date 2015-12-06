@@ -16,6 +16,7 @@
 package edu.mit.csail.sdg.alloy4;
 
 import java.util.ArrayList;
+
 import edu.mit.csail.sdg.alloy4.Listener.Event;
 
 /** This stores a list of listeners. */
