@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,9 @@ import kodkod.ast.Decl;
 import kodkod.ast.Formula;
 import kodkod.ast.Relation;
 import kodkod.engine.bool.BooleanFormula;
+import kodkod.engine.hol.HOLTranslation;
 import kodkod.instance.Bounds;
+import kodkod.instance.Instance;
 import kodkod.util.ints.IntSet;
 
 /**
@@ -43,28 +45,23 @@ public abstract class AbstractReporter implements Reporter {
 	 * Constructs a new abstract reporter.
 	 */
 	protected AbstractReporter() {}
-	
+
 	/**
 	 * {@inheritDoc}
 	 * @see kodkod.engine.config.Reporter#detectingSymmetries(kodkod.instance.Bounds)
 	 */
 	public void detectingSymmetries(Bounds bounds){}
-	
+
 	/**
 	 * {@inheritDoc}
 	 * @see kodkod.engine.config.Reporter#detectedSymmetries(java.util.Set)
 	 */
 	public void detectedSymmetries(Set<IntSet> parts) {}
-	
+
 	/**
 	 * @see kodkod.engine.config.Reporter#generatingSBP()
 	 */
 	public void generatingSBP() {}
-
-	/**
-	 * @see kodkod.engine.config.Reporter#flattening(kodkod.engine.bool.BooleanFormula)
-	 */
-	public void flattening(BooleanFormula circuit) {}
 
 	/**
 	 * {@inheritDoc}
@@ -91,5 +88,25 @@ public abstract class AbstractReporter implements Reporter {
 	 * @see kodkod.engine.config.Reporter#translatingToCNF(kodkod.engine.bool.BooleanFormula)
 	 */
 	public void translatingToCNF(BooleanFormula circuit) {}
+
+    public void convertingToNNF() {}
+    public void holLoopStart(HOLTranslation tr, Formula formula, Bounds bounds) {}
+    public void holCandidateFound(HOLTranslation tr, Instance candidate) {}
+    public void holVerifyingCandidate(HOLTranslation tr, Instance candidate, Formula checkFormula, Bounds bounds) {}
+    public void holCandidateVerified(HOLTranslation tr, Instance candidate) {}
+    public void holCandidateNotVerified(HOLTranslation tr, Instance candidate, Instance cex) {}
+    public void holFindingNextCandidate(HOLTranslation tr, Formula inc) {}
+
+	public void holSplitStart(HOLTranslation tr, Formula formula) {}
+	public void holSplitChoice(HOLTranslation tr, Formula formula, Bounds bounds) {}
+	public void holSplitChoiceSAT(HOLTranslation tr, Instance inst) {}
+	public void holSplitChoiceUNSAT(HOLTranslation tr) {}
+
+    public void holFixpointStart(HOLTranslation tr, Formula formula, Bounds bounds) {}
+    public void holFixpointNoSolution(HOLTranslation tr) {}
+    public void holFixpointFirstSolution(HOLTranslation tr, Instance candidate) {}
+    public void holFixpointIncrementing(HOLTranslation tr, Formula inc) {}
+    public void holFixpointIncrementingOutcome(HOLTranslation tr, Instance next) {}
+
 
 }

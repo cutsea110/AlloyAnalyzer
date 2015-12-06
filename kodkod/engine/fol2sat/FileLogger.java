@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -147,8 +147,8 @@ final class FileLogger extends TranslationLogger {
 	 * in the specified environment.
 	 * @requires some this.transforms.f
 	 * @ensures this.records' = this.records + this.transforms.f -> translation -> freeVariables(f)<:env
-	 * @throws IllegalArgumentException - no this.transforms.f
-	 * @throws IllegalStateException - this log has been closed
+	 * @throws IllegalArgumentException  no this.transforms.f
+	 * @throws IllegalStateException  this log has been closed
 	 */
 	@Override
 	void log(Formula f, BooleanValue v, Environment<BooleanMatrix, Expression> env) {

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -351,7 +351,12 @@ final class LazyTrace implements ResolutionTrace {
 	 * {@inheritDoc}
 	 * @see kodkod.engine.satlab.ResolutionTrace#resolvents()
 	 */
-	public IntSet resolvents() { return Ints.rangeSet(Ints.range(axioms, trace.length-1)); }
+	public IntSet resolvents() { 
+		if (trace.length > axioms)
+			return Ints.rangeSet(Ints.range(axioms, trace.length-1)); 
+		else
+			return Ints.EMPTY_SET;
+	}
 	
 	/**
 	 * {@inheritDoc}

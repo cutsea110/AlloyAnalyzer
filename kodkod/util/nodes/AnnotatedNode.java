@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,38 +28,54 @@ import static kodkod.ast.operator.FormulaOperator.AND;
 import static kodkod.ast.operator.FormulaOperator.IMPLIES;
 import static kodkod.ast.operator.FormulaOperator.OR;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import kodkod.ast.BinaryExpression;
 import kodkod.ast.BinaryFormula;
+import kodkod.ast.BinaryIntExpression;
 import kodkod.ast.ComparisonFormula;
 import kodkod.ast.Comprehension;
 import kodkod.ast.ConstantExpression;
+import kodkod.ast.ConstantFormula;
 import kodkod.ast.Decl;
 import kodkod.ast.Decls;
 import kodkod.ast.ExprToIntCast;
 import kodkod.ast.Expression;
+import kodkod.ast.FixFormula;
 import kodkod.ast.Formula;
 import kodkod.ast.IfExpression;
 import kodkod.ast.IfIntExpression;
 import kodkod.ast.IntComparisonFormula;
+import kodkod.ast.IntConstant;
+import kodkod.ast.IntExpression;
 import kodkod.ast.IntToExprCast;
 import kodkod.ast.MultiplicityFormula;
+import kodkod.ast.NaryExpression;
 import kodkod.ast.NaryFormula;
+import kodkod.ast.NaryIntExpression;
 import kodkod.ast.Node;
 import kodkod.ast.NotFormula;
+import kodkod.ast.ProjectExpression;
 import kodkod.ast.QuantifiedFormula;
 import kodkod.ast.Relation;
 import kodkod.ast.RelationPredicate;
 import kodkod.ast.SumExpression;
+import kodkod.ast.UnaryExpression;
+import kodkod.ast.UnaryIntExpression;
 import kodkod.ast.Variable;
 import kodkod.ast.operator.ExprCastOperator;
 import kodkod.ast.operator.FormulaOperator;
+import kodkod.ast.operator.Multiplicity;
 import kodkod.ast.visitor.AbstractDetector;
 import kodkod.ast.visitor.AbstractVoidVisitor;
+import kodkod.ast.visitor.ReturnVisitor;
 import kodkod.util.collections.ArrayStack;
 import kodkod.util.collections.IdentityHashSet;
 import kodkod.util.collections.Stack;
@@ -69,18 +85,19 @@ import kodkod.util.collections.Stack;
  * structural sharing in its ast/dag.  The class
  * also provides utility methods for collecting
  * various information about annotated nodes.
- * 
+ *
  * @specfield node: N // annotated node
- * @specfield source: node.*components ->one Node // maps the subnodes of this.node to nodes from 
+ * @specfield source: node.*components ->one Node // maps the subnodes of this.node to nodes from
  *                                            // which they were derived by some transformation process
- *                                            // (e.g. skolemization, predicate inlining)                                     
+ *                                            // (e.g. skolemization, predicate inlining)
  * @author Emina Torlak
- */ 
+ */
 public final class AnnotatedNode<N extends Node> {
 	private final N node;
 	private final Set<Node> sharedNodes;
 	private final Map<? extends Node, ? extends Node> source;
-	
+	private Map<? extends Node, Boolean> holAnnotations;
+
 	/**
 	 * Constructs a new annotator for the given node.
 	 * @ensures this.node' = node && this.source' = node.*components<:iden
@@ -89,11 +106,11 @@ public final class AnnotatedNode<N extends Node> {
 		this.node = node;
 		final SharingDetector detector = new SharingDetector();
 		node.accept(detector);
-		this.sharedNodes = Collections.unmodifiableSet(detector.sharedNodes());
-		this.source = Collections.emptyMap();
+        this.sharedNodes = Collections.unmodifiableSet(detector.sharedNodes());
+        this.source = Collections.emptyMap();
 	}
-	
-	
+
+
 	/**
 	 * Constructs a new annotator for the given node and source map.
 	 * @ensures this.node' = node && this.source' = node.*components<:iden ++ source
@@ -105,14 +122,32 @@ public final class AnnotatedNode<N extends Node> {
 		this.sharedNodes = Collections.unmodifiableSet(detector.sharedNodes());
 		this.source = source;
 	}
-	
+
+	public boolean hasHOLannotations() { return holAnnotations != null; }
+	public void annotateHOL() {
+	    HOLAnnotator a = new HOLAnnotator();
+	    this.node.accept(a);
+        holAnnotations = a.holAnnotations;
+	}
+
+	public boolean isHOLNode(Node n) {
+	    assert holAnnotations != null : "not annotated for HOL";
+	    Boolean ans = holAnnotations != null ? holAnnotations.get(n) : null;
+	    //assert ans != null : "node " + n + " not found in holAnnotations";
+	    return !Boolean.FALSE.equals(ans);
+	}
+
+	public boolean isFOLNode(Node n) {
+	    return !isHOLNode(n);
+	}
+
 	/**
 	 * Returns an annotation for the given node.  The source map of the returned annotation object
 	 * maps each descendant of the node to itself.
 	 * @return { a: AnnotatedNode<N> | a.node = node && a.source = node.*components<:iden }
 	 */
 	public static <N extends Node> AnnotatedNode<N> annotate(N node) { return new AnnotatedNode<N>(node); }
-	
+
 	/**
 	 * Returns an annotation for the given node.  The source map of the returned annotation object
 	 * maps each descendant of the node to its value in the given source map, or to itself
@@ -120,18 +155,18 @@ public final class AnnotatedNode<N extends Node> {
 	 * @return { a: AnnotatedNode<N> | a.node = node && a.source = (node.*components<:iden) ++ source }
 	 */
 	public static <N extends Node> AnnotatedNode<N> annotate(N node, Map<? extends Node, ? extends Node> source) { return new AnnotatedNode<N>(node,source); }
-	
+
 	/**
-	 * Returns an annotation for an n-ary conjunctions of  {@linkplain Nodes#roots(Formula) roots} of the given formula. 
-	 * The source map of the returned annotation object maps each descendant of the node to itself.  
+	 * Returns an annotation for an n-ary conjunctions of  {@linkplain Nodes#roots(Formula) roots} of the given formula.
+	 * The source map of the returned annotation object maps each descendant of the node to itself.
 	 * The root conjunction itself is mapped to the input formula.
 	 * @return { a: AnnotatedNode<Formula> | a.node = Formula.and(Nodes.roots(formula)) && a.source = (node.^components<:iden) + a.node->formula }
 	 */
-	public static AnnotatedNode<Formula> annotateRoots(Formula formula) { 
+	public static AnnotatedNode<Formula> annotateRoots(Formula formula) {
 		final Formula flat = Formula.and(Nodes.roots(formula));
 		return new AnnotatedNode<Formula>(flat, Collections.singletonMap(flat, formula));
 	}
-	
+
 	/**
 	 * Returns this.node.
 	 * @return this.node
@@ -139,7 +174,7 @@ public final class AnnotatedNode<N extends Node> {
 	public final N node() {
 		return node;
 	}
-	
+
 	/**
 	 * Returns the source of the the given descendant of this.node.
 	 * @requires n in this.node.*components
@@ -150,15 +185,15 @@ public final class AnnotatedNode<N extends Node> {
 		return d==null ? n : d;
 	}
 
-	
+
 	/**
 	 * Returns the set of all non-leaf descendants of this.node that have more than one parent.
 	 * @return {n: Node | some n.children && #(n.~components & this.node.*components) > 1 }
 	 */
-	public final Set<Node> sharedNodes() { 
+	public final Set<Node> sharedNodes() {
 		return sharedNodes;
 	}
-	
+
 	/**
 	 * Returns the set of all relations at the leaves of this annotated node.
 	 * @return Relation & this.node.*components
@@ -177,11 +212,23 @@ public final class AnnotatedNode<N extends Node> {
 		node.accept(visitor);
 		return relations;
 	}
-	
+
+	public final Set<Relation> atomRelations() {
+	    final Set<Relation> ans = new IdentityHashSet<Relation>();
+	    for (Relation r : relations()) if (r.isAtom()) ans.add(r);
+	    return ans;
+	}
+
+	public final Set<Relation> skolemRelations() {
+        final Set<Relation> ans = new IdentityHashSet<Relation>();
+        for (Relation r : relations()) if (r.isSkolem()) ans.add(r);
+        return ans;
+    }
+
 	/**
-	 * Returns true if this.node contains a child whose meaning depends on 
+	 * Returns true if this.node contains a child whose meaning depends on
 	 * integer bounds (i.e. an ExprToIntCast node with SUM operator or an IntToExprCast node or Expression.INTS constant).
-	 * @return true if this.node contains a child whose meaning depends on 
+	 * @return true if this.node contains a child whose meaning depends on
 	 * integer bounds (i.e. an ExprToIntCast node with SUM operator or an IntToExprCast node or Expression.INTS constant).
 	 */
 	public final boolean usesInts() {
@@ -200,20 +247,20 @@ public final class AnnotatedNode<N extends Node> {
 		};
 		return (Boolean)node.accept(detector);
 	}
-	
+
 	/**
 	 * Returns a map of RelationPredicate names to sets of top-level relation predicates with
-	 * the corresponding names in this.node.  
+	 * the corresponding names in this.node.
 	 * @return a map of RelationPredicate names to sets of top-level relation predicates with
-	 * the corresponding names in this.node.  A predicate is considered 'top-level'  
-	 * if it is a component of the top-level conjunction, if any, of this.node.  
+	 * the corresponding names in this.node.  A predicate is considered 'top-level'
+	 * if it is a component of the top-level conjunction, if any, of this.node.
 	 */
 	public final Map<RelationPredicate.Name, Set<RelationPredicate>> predicates() {
 		final PredicateCollector collector = new PredicateCollector(sharedNodes);
 		node.accept(collector);
 		return collector.preds;
 	}
-	
+
 	/**
 	 * Returns a Detector that will return TRUE when applied to a descendent
 	 * of this.node iff the descendent contains a quantified formula.
@@ -227,7 +274,7 @@ public final class AnnotatedNode<N extends Node> {
 			}
 		};
 	}
-	
+
 	/**
 	 * Returns a Detector that will return TRUE when applied to a descendent
 	 * of this.node iff the descendent contains a free variable.
@@ -237,7 +284,7 @@ public final class AnnotatedNode<N extends Node> {
 	public final AbstractDetector freeVariableDetector() {
 		return new FreeVariableDetector(sharedNodes);
 	}
-	
+
 	/**
 	 * Returns a string representation of this annotated node.
 	 * @return string representation of this annotated node.
@@ -252,10 +299,10 @@ public final class AnnotatedNode<N extends Node> {
 		ret.append(source);
 		return ret.toString();
 	}
-	
+
 	/**
 	 * Detects shared non-leaf descendents of a given node.
-	 * 
+	 *
 	 * @specfield node: Node // node to which the analyzer is applied
 	 */
 	private static final class SharingDetector extends AbstractVoidVisitor {
@@ -264,11 +311,11 @@ public final class AnnotatedNode<N extends Node> {
 		final IdentityHashMap<Node,Boolean> sharingStatus;
 		/* @invariant numShareNodes = #sharingStatus.TRUE */
 		int numSharedNodes;
-		
+
 		SharingDetector() {
 			sharingStatus = new IdentityHashMap<Node,Boolean>();
 		}
-		
+
 		/**
 		 * Returns the shared internal nodes of this.node.  This method should
 		 * be called only after this visitor has been applied to this.node.
@@ -282,11 +329,11 @@ public final class AnnotatedNode<N extends Node> {
 			}
 			return shared;
 		}
-		
+
 		/**
 		 * Records the visit to the given node in the status map.
 		 * If the node has not been visited before, it is mapped
-		 * to Boolean.FALSE and false is returned.  Otherwise, 
+		 * to Boolean.FALSE and false is returned.  Otherwise,
 		 * it is mapped to Boolean.TRUE and true is returned.
 		 * The first time a Node is mapped to true, numSharedNodes
 		 * is incremented by one.
@@ -317,20 +364,20 @@ public final class AnnotatedNode<N extends Node> {
 	private static final class FreeVariableDetector extends AbstractDetector {
 		/* Holds the variables that are currently in scope, with the
 		 * variable at the top of the stack being the last declared variable. */
-		
+
 		private final Stack<Variable> varsInScope = new ArrayStack<Variable>();
-		
+
 		/**
 		 * Constructs a new free variable detector.
 		 */
 		FreeVariableDetector(Set<Node> sharedNodes) {
 			super(sharedNodes);
 		}
-		
+
 		/**
-		 * Visits the given comprehension, quantified formula, or sum expression.  
-		 * The method returns TRUE if the creator body contains any 
-		 * variable not bound by the decls; otherwise returns FALSE.  
+		 * Visits the given comprehension, quantified formula, or sum expression.
+		 * The method returns TRUE if the creator body contains any
+		 * variable not bound by the decls; otherwise returns FALSE.
 		 */
 		private Boolean visit(Node creator, Decls decls, Node body) {
 			Boolean ret = lookup(creator);
@@ -352,15 +399,15 @@ public final class AnnotatedNode<N extends Node> {
 		 */
 		public Boolean visit(Variable variable) {
 			return Boolean.valueOf(varsInScope.search(variable)<0);
-		}	
+		}
 		public Boolean visit(Decl decl) {
 			Boolean ret = lookup(decl);
 			if (ret!=null) return ret;
 			return cache(decl, decl.expression().accept(this));
-		}	
+		}
 		public Boolean visit(Comprehension comprehension) {
 			return visit(comprehension, comprehension.decls(), comprehension.formula());
-		}		
+		}
 		public Boolean visit(SumExpression intExpr) {
 			return visit(intExpr, intExpr.decls(), intExpr.intExpr());
 		}
@@ -368,7 +415,7 @@ public final class AnnotatedNode<N extends Node> {
 			return visit(qformula, qformula.decls(), qformula.formula());
 		}
 	}
-	
+
 	/**
 	 * A visitor that detects and collects
 	 * top-level relation predicates; i.e. predicates that
@@ -379,10 +426,10 @@ public final class AnnotatedNode<N extends Node> {
 		protected boolean negated;
 		private final Set<Node> sharedNodes;
 		/* if a given node is not mapped at all, it means that it has not been visited;
-		 * if it is mapped to FALSE, it has been visited with negated=FALSE, 
+		 * if it is mapped to FALSE, it has been visited with negated=FALSE,
 		 * if it is mapped to TRUE, it has been visited with negated=TRUE,
 		 * if it is mapped to null, it has been visited with both values of negated. */
-		private final Map<Node,Boolean> visited;	
+		private final Map<Node,Boolean> visited;
 		/* holds the top level predicates at the the end of the visit*/
 		final EnumMap<RelationPredicate.Name, Set<RelationPredicate>> preds;
 		/**
@@ -393,7 +440,7 @@ public final class AnnotatedNode<N extends Node> {
 			this.sharedNodes = sharedNodes;
 			this.visited = new IdentityHashMap<Node,Boolean>();
 			this.negated = false;
-			preds = new EnumMap<RelationPredicate.Name, Set<RelationPredicate>>(RelationPredicate.Name.class);	
+			preds = new EnumMap<RelationPredicate.Name, Set<RelationPredicate>>(RelationPredicate.Name.class);
 			preds.put(ACYCLIC, new IdentityHashSet<RelationPredicate>(4));
 			preds.put(TOTAL_ORDERING, new IdentityHashSet<RelationPredicate>(4));
 			preds.put(FUNCTION, new IdentityHashSet<RelationPredicate>(8));
@@ -414,7 +461,7 @@ public final class AnnotatedNode<N extends Node> {
 				} else {
 					final Boolean visit = visited.get(n);
 					if (visit==null || visit==negated) { // already visited with same negated value
-						return true; 
+						return true;
 					} else { // already visited with different negated value
 						visited.put(n, null);
 						return false;
@@ -467,7 +514,7 @@ public final class AnnotatedNode<N extends Node> {
 		public void visit(BinaryFormula binFormula) {
 			if (visited(binFormula)) return;
 			final FormulaOperator op = binFormula.op();
-		
+
 			if ((!negated && op==AND) || (negated && op==OR)) { // op==AND || op==OR
 				binFormula.left().accept(this);
 				binFormula.right().accept(this);
@@ -476,7 +523,7 @@ public final class AnnotatedNode<N extends Node> {
 				binFormula.left().accept(this);
 				negated = !negated;
 				binFormula.right().accept(this);
-			} 
+			}
 		}
 		/**
 		 * Visits the children of the given formula if it has not been visited already with
@@ -484,20 +531,20 @@ public final class AnnotatedNode<N extends Node> {
 		 * formula.op==AND && !negated. Otherwise does nothing.
 		 * @see kodkod.ast.visitor.AbstractVoidVisitor#visit(kodkod.ast.NaryFormula)
 		 */
-		public void visit(NaryFormula formula) { 
+		public void visit(NaryFormula formula) {
 			if (visited(formula)) return;
 			final FormulaOperator op = formula.op();
 			if ((!negated && op==AND) || (negated && op==OR)) { // op==AND || op==OR
-				for(Formula child : formula) { 
+				for(Formula child : formula) {
 					child.accept(this);
 				}
 			}
 		}
-		
+
 		/**
 		 * Visits the children of the child of the child formula, with
-		 * the negation of the current value of the negated flag, 
-		 * if it has not already been visited 
+		 * the negation of the current value of the negated flag,
+		 * if it has not already been visited
 		 * with the current value of this.negated; otherwise does nothing.
 		 */
 		public void visit(NotFormula not) {
@@ -529,5 +576,95 @@ public final class AnnotatedNode<N extends Node> {
 				preds.get(pred.name()).add(pred);
 			}
 		}
+	}
+
+	static class HOLAnnotator implements ReturnVisitor<Boolean, Boolean, Boolean, Boolean> {
+
+	    private Map<Node, Boolean> holAnnotations = new IdentityHashMap<Node, Boolean>();
+
+	    private Boolean get(Node n)              { return holAnnotations.get(n); }
+	    private Boolean place(Node n, Boolean b) { holAnnotations.put(n, b); return b; }
+	    private Boolean noHOL(Node n)            { return place(n, Boolean.FALSE); }
+
+        private <E extends Node> Boolean checkVisitedThenAccumA(Node n, Boolean acc, E... subs) {
+            return checkVisitedThenAccum(n, acc, Arrays.asList(subs));
+        }
+        private <E extends Node> Boolean checkVisitedThenAccum(Node n, Boolean acc, Iterable<E> subs) {
+            Boolean ans = get(n); if (ans != null) return ans;
+            return accum(n, acc, subs);
+        }
+        private <E extends Node> Boolean accum(Node n, Boolean acc, Iterable<E> subs) {
+            for(Node child : subs) {
+                Boolean res = (Boolean)child.accept(this);
+                acc = acc || res;
+            }
+            return place(n, acc);
+        }
+
+	    public Boolean visit(Decls decls) { return checkVisitedThenAccum(decls, Boolean.FALSE, decls); }
+
+	    public Boolean visit(Decl decl) {
+	        return checkVisitedThenAccumA(decl, decl.multiplicity() != Multiplicity.ONE, decl.variable(), decl.expression());
+	    }
+
+	    public Boolean visit(Relation relation)            { return noHOL(relation); }
+	    public Boolean visit(Variable variable)            { return noHOL(variable); }
+	    public Boolean visit(ConstantExpression constExpr) { return noHOL(constExpr); }
+
+	    public Boolean visit(NaryExpression expr)   { return checkVisitedThenAccum(expr, Boolean.FALSE, expr); }
+	    public Boolean visit(BinaryExpression expr) { return checkVisitedThenAccumA(expr, Boolean.FALSE, expr.left(), expr.right()); }
+	    public Boolean visit(UnaryExpression expr)  { return checkVisitedThenAccumA(expr, Boolean.FALSE, expr.expression()); }
+	    public Boolean visit(Comprehension cph)     { return checkVisitedThenAccumA(cph, Boolean.FALSE, cph.decls(), cph.formula()); }
+	    public Boolean visit(IfExpression ife)      { return checkVisitedThenAccumA(ife, Boolean.FALSE, ife.condition(), ife.thenExpr(), ife.elseExpr()); }
+
+	    public Boolean visit(ProjectExpression project) {
+	        Boolean ans = get(project); if (ans != null) return ans;
+	        List<IntExpression> cols = new ArrayList<IntExpression>(project.arity());
+	        for(int i = 0, arity = project.arity(); i < arity; i++) {
+	            cols.add(project.column(i));
+	        }
+	        return accum(project, project.expression().accept(this), cols);
+	    }
+
+	    public Boolean visit(IntToExprCast castExpr) { return checkVisitedThenAccumA(castExpr, Boolean.FALSE, castExpr.intExpr()); }
+	    public Boolean visit(IntConstant intConst)   { return noHOL(intConst); }
+	    public Boolean visit(IfIntExpression e)      { return checkVisitedThenAccumA(e, Boolean.FALSE, e.condition(), e.thenExpr(), e.elseExpr()); }
+	    public Boolean visit(ExprToIntCast e)        { return checkVisitedThenAccumA(e, Boolean.FALSE, e.expression()); }
+	    public Boolean visit(NaryIntExpression e)    { return checkVisitedThenAccum(e, Boolean.FALSE, e); }
+	    public Boolean visit(BinaryIntExpression e)  { return checkVisitedThenAccumA(e, Boolean.FALSE, e.left(), e.right()); }
+	    public Boolean visit(UnaryIntExpression e)   { return checkVisitedThenAccumA(e, Boolean.FALSE, e.intExpr()); }
+	    public Boolean visit(SumExpression e)        { return checkVisitedThenAccumA(e, Boolean.FALSE, e.decls(), e.intExpr()); }
+	    public Boolean visit(IntComparisonFormula f) { return checkVisitedThenAccumA(f, Boolean.FALSE, f.left(), f.right()); }
+	    public Boolean visit(QuantifiedFormula f)    { return checkVisitedThenAccumA(f, Boolean.FALSE, f.decls(), f.formula()); }
+	    public Boolean visit(NaryFormula f)          { return checkVisitedThenAccum(f, Boolean.FALSE, f); }
+	    public Boolean visit(BinaryFormula f)        { return checkVisitedThenAccumA(f, Boolean.FALSE, f.left(), f.right()); }
+	    public Boolean visit(NotFormula f)           { return checkVisitedThenAccumA(f, Boolean.FALSE, f.formula()); }
+	    public Boolean visit(ConstantFormula cnst)   { return noHOL(cnst); }
+	    public Boolean visit(ComparisonFormula f)    { return checkVisitedThenAccumA(f, Boolean.FALSE, f.left(), f.right()); }
+	    public Boolean visit(MultiplicityFormula f)  { return checkVisitedThenAccumA(f, Boolean.FALSE, f.expression()); }
+
+	    public Boolean visit(RelationPredicate pred) {
+	        Boolean ans = get(pred); if (ans != null) return ans;
+	        pred.relation().accept(this);
+	        if (pred.name()==RelationPredicate.Name.FUNCTION) {
+	            final RelationPredicate.Function fp = (RelationPredicate.Function) pred;
+	            fp.domain().accept(this);
+	            fp.range().accept(this);
+	        } else if (pred.name()==RelationPredicate.Name.TOTAL_ORDERING) {
+	            final RelationPredicate.TotalOrdering tp = (RelationPredicate.TotalOrdering) pred;
+	            tp.ordered().accept(this);
+	            tp.first().accept(this);
+	            tp.last().accept(this);
+	        }
+	        return noHOL(pred);
+	    }
+
+	    @Override
+	    public Boolean visit(FixFormula f) { return checkVisitedThenAccumA(f, Boolean.TRUE, f.formula(), f.condition()); }
+
+	}
+
+	public Map<? extends Node, ? extends Node> sources() {
+		return Collections.unmodifiableMap(this.source);
 	}
 }

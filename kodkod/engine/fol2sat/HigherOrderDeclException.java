@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,17 +22,20 @@
 package kodkod.engine.fol2sat;
 
 import kodkod.ast.Decl;
+import kodkod.ast.FixFormula;
+import kodkod.ast.Node;
 import kodkod.ast.operator.Multiplicity;
 
 /**
  * Thrown when a node contains a higher order declaration that cannot
  * be skolemized, or it can be skolemized but skolemization is disabled.
- * 
+ *
  * @specfield decl: Decl // higher order decl that caused the exception to be thrown
  * @author Emina Torlak
  */
 public final class HigherOrderDeclException extends RuntimeException {
-	private final Decl decl;
+	private final Node node;
+	private final boolean isDecl;
 	private static final long serialVersionUID = 1892780864484615171L;
 
 	/**
@@ -40,18 +43,28 @@ public final class HigherOrderDeclException extends RuntimeException {
 	 * @requires decl.multiplicity != ONE
 	 * @ensures this.decl' = decl
 	 */
-	 HigherOrderDeclException(Decl decl) {
-		super("Higher order declaration: " + decl);
+	 public HigherOrderDeclException(Decl decl) {
+	    super("Higher order declaration: " + decl);
 		assert decl.multiplicity() != Multiplicity.ONE;
-		this.decl = decl;
-	}
+		this.node = decl;
+		this.isDecl = true;
+	 }
+
+	 public HigherOrderDeclException(FixFormula ff) {
+         super("Fixed point formula: " + ff);
+         this.node = ff;
+         this.isDecl = false;
+     }
 
 	/**
 	 * Returns this.decl
 	 * @return this.decl
 	 */
 	public Decl decl() {
-		return decl;
+		return isDecl ? (Decl)node : null;
 	}
 
+	public Node node() {
+	    return node;
+	}
 }

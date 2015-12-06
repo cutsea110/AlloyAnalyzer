@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -44,7 +44,7 @@ public abstract class LeafExpression extends Expression {
 	 * Constructs a leaf with the specified name and arity
 	 * 
 	 * @ensures  this.name' = name && this.arity' = arity 
-	 * @throws IllegalArgumentException - arity < 1
+	 * @throws IllegalArgumentException  arity < 1
 	 */
 	LeafExpression(String name, int arity) {
 		if (arity < 1) {

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -146,7 +146,7 @@ final class NaryGate extends MultiGate {
 	 * Returns the ith input to this gate.
 	 * @return this.inputs[i]
 	 * @requires 0 <= i < size
-	 * @throws IndexOutOfBoundsException - i < 0 || i >= #this.inputs
+	 * @throws IndexOutOfBoundsException  i < 0 || i >= #this.inputs
 	 */
 	@Override
 	public BooleanFormula input(int i) {

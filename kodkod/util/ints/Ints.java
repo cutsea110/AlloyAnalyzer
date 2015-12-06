@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@ package kodkod.util.ints;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import kodkod.util.collections.Containers;
 import kodkod.util.ints.IntRange.OnePointRange;
 import kodkod.util.ints.IntRange.TwoPointRange;
 
@@ -39,6 +40,8 @@ import kodkod.util.ints.IntRange.TwoPointRange;
  * @author Emina Torlak
  */
 public final class Ints {
+	private static final int BITSET_CUTOFF = 1024;
+	
 	/** An immutable empty int set. The clone method returns the empty set itself. */
 	public static final IntSet EMPTY_SET = 
 		new AbstractIntSet() {
@@ -58,6 +61,18 @@ public final class Ints {
 			public IntSet clone() { return EMPTY_SET;}
 	};
 	
+	/** An immutable empty sequence. The clone method returns the empty set itself. */
+	public static final SparseSequence<?> EMPTY_SEQUENCE = 
+		new AbstractSparseSequence<Object>() {
+			public int size() { return 0; }
+			public boolean containsIndex(int idx) { return false; }
+			public boolean contains(Object o) { return false; }
+			public IntSet indices() { return EMPTY_SET; }
+			public Object get(int index) { return null;}
+			public Iterator<IndexedEntry<Object>> iterator(int from, int to) { return Containers.emptyIterator(); }
+			public SparseSequence<Object> clone() { return this; }
+		};
+	
 	private Ints() {}
 
 	/*-----------SETS AND RANGES-----------*/
@@ -65,7 +80,7 @@ public final class Ints {
 	/**
 	 * Returns an integer range from min, inclusive, to max, inclusive.
 	 * @return { r: IntRange | r.min = min && r.max = max }
-	 * @throws IllegalArgumentException - min > max
+	 * @throws IllegalArgumentException  min > max
 	 */
 	public static IntRange range(int min, int max) {
 		if (min < max) return new TwoPointRange(min,max);
@@ -78,7 +93,7 @@ public final class Ints {
 	 * both r1 and r2.
 	 * @return { r: IntRange | r.contains(r1) && r.contains(r2) && 
 	 *           no r' : IntRange - r | r'.contains(r1) && r'.contains(r2) && r'.size() < r.size() }
-	 * @throws NullPointerException - range = null
+	 * @throws NullPointerException  range = null
 	 */
 	public static IntRange merge(IntRange r1, IntRange r2) {
 		if (r1.contains(r2)) return r1;
@@ -94,7 +109,7 @@ public final class Ints {
 	 * in an UnsupportedOperationException.  The clone() method of the returned set
 	 * returns the result of calling s.clone().
 	 * @return an unmodifiable view of s
-	 * @throws NullPointerException - s = null
+	 * @throws NullPointerException  s = null
 	 */
 	public static IntSet unmodifiableIntSet(final IntSet s) {
 		if (s==null) 
@@ -137,8 +152,7 @@ public final class Ints {
 	 * elements in [0..max).
 	 */
 	public static IntSet bestSet(int max) {
-		// cut-off for using a bit map is 512
-		return max > 512 ? new IntTreeSet() : new IntBitSet(max);
+		return max > BITSET_CUTOFF ? new IntTreeSet() : new IntBitSet(max);
 	}
 
 	/**
@@ -149,7 +163,7 @@ public final class Ints {
 	 * out of the specified range.
 	 * @return an int set that can store at least the 
 	 * elements in the given range.
-	 * @throws IllegalArgumentException - min > max
+	 * @throws IllegalArgumentException  min > max
 	 */
 	public static IntSet bestSet(int min, int max) {
 		if (min > max) throw new IllegalArgumentException("min > max");
@@ -210,6 +224,16 @@ public final class Ints {
 	}
 	
 	/*-----------SEQUENCES-----------*/
+	
+	/**
+	 * Returns {@linkplain #EMPTY_SEQUENCE} cast to a sequence of type SparseSequence<V>.
+	 * @return {@linkplain #EMPTY_SEQUENCE}
+	 */
+	@SuppressWarnings("unchecked")
+	public static <V> SparseSequence<V> emptySequence() { 
+		return (SparseSequence<V>) EMPTY_SEQUENCE;
+	}
+	
 	/**
 	 * Returns an unmodifiable view of the specified sparse sequence. This method 
 	 * allows modules to provide users with "read-only" access to internal sparse sequences.
@@ -218,7 +242,7 @@ public final class Ints {
 	 * in an UnsupportedOperationException.  The clone() method of the returned sequence
 	 * returns the result of calling s.clone().
 	 * @return an unmodifiable view of s
-	 * @throws NullPointerException - s = null
+	 * @throws NullPointerException  s = null
 	 */
 	public static <V> SparseSequence<V> unmodifiableSequence(SparseSequence<V> s) {
 		if (s==null) 
@@ -364,7 +388,8 @@ public final class Ints {
 			};
 		}
 		public int size() {	return range.size(); }
-		public IntSet copy() { return this; }
+		@SuppressWarnings("unused")
+        public IntSet copy() { return this; }
 		public int floor(int i) {
 			if (i<range.min())
 				throw new NoSuchElementException();
@@ -405,7 +430,8 @@ public final class Ints {
 			};
 		}
 		public int size() {	return 1; }
-		public IntSet copy() { return this; }
+		@SuppressWarnings("unused")
+        public IntSet copy() { return this; }
 		public boolean equals(Object o) {
 			if (this==o) return true;
 			else if (o instanceof IntSet) {
@@ -444,7 +470,8 @@ public final class Ints {
 		public boolean contains(int i) { return s.contains(i); }
 		public int min() { return s.min();	}
 		public int max() { return s.max();	}
-		public boolean containsAll(IntSet other) { return s.containsAll(other ); }	
+		@SuppressWarnings("unused")
+        public boolean containsAll(IntSet other) { return s.containsAll(other ); }	
 		public IntIterator iterator(final int from, final int to) { 	
 			return new IntIterator() {
 				IntIterator iter = s.iterator(from,to);

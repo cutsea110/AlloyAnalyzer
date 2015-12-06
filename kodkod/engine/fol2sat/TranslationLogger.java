@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -46,8 +46,8 @@ abstract class TranslationLogger {
 	 * in the specified environment.
 	 * @requires f in this.formula.*children
 	 * @ensures this.records' = this.records or this.records' = this.records + f -> translation -> freeVariables(f)<:env
-	 * @throws IllegalArgumentException - some aspect of the given translation event prevents it from being logged
-	 * @throws IllegalStateException - this log has been closed
+	 * @throws IllegalArgumentException  some aspect of the given translation event prevents it from being logged
+	 * @throws IllegalStateException  this log has been closed
 	 */
 	abstract void log(Formula f, BooleanValue translation, Environment<BooleanMatrix, Expression> env);
 	

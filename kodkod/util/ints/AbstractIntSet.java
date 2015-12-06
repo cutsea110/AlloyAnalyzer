@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -37,7 +37,7 @@ public abstract class AbstractIntSet extends AbstractIntCollection implements In
 	
 	/**
 	 * Throws a NoSuchElementException if this is an empty set.
-	 * @throws NoSuchElementException - this.isEmpty()
+	 * @throws NoSuchElementException  this.isEmpty()
 	 */
 	final void checkNonEmpty() {
 		if  (isEmpty()) throw new NoSuchElementException("no this.ints");
@@ -56,7 +56,7 @@ public abstract class AbstractIntSet extends AbstractIntCollection implements In
 	 * Returns the first element returned by this.iterator().
 	 * If this set is empty, throws a NoSuchElementException().
 	 * @return min(this.ints)
-	 * @throws NoSuchElementException - no this.ints
+	 * @throws NoSuchElementException  no this.ints
 	 */
 	public int min() {
 		return iterator().next();
@@ -66,7 +66,7 @@ public abstract class AbstractIntSet extends AbstractIntCollection implements In
 	 * Returns the first element returned by this.iterator(Integer.MAX_VALUE, Integer.MIN_VALUE).
 	 * If this set is empty, throws a NoSuchElementException().
 	 * @return max(this.ints)
-	 * @throws NoSuchElementException - no this.ints
+	 * @throws NoSuchElementException  no this.ints
 	 */
 	public int max() {
 		return iterator(Integer.MAX_VALUE, Integer.MIN_VALUE).next();

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -151,7 +151,7 @@ public final class IdentityHashSet<T> extends AbstractSet<T> {
 	 * the set may cause the internal data structure to grow, which may be
 	 * somewhat time-consuming.
 	 * @ensures no this.elems'
-	 * @throws IllegalArgumentException - <tt>expectedMaxSize</tt> < 0
+	 * @throws IllegalArgumentException  <tt>expectedMaxSize</tt> < 0
 	 */
 	public IdentityHashSet(int expectedMaxSize) {
 		if (expectedMaxSize < 0)
@@ -167,7 +167,7 @@ public final class IdentityHashSet<T> extends AbstractSet<T> {
 	 * Constructs a new identity hash set containing the elements
 	 * in the specified collection.
 	 * @ensures this.elems' = c.elems
-	 * @throws NullPointerException - c = null
+	 * @throws NullPointerException  c = null
 	 */
 	public IdentityHashSet(Collection<? extends T> c) {
 		// Allow for a bit of growth

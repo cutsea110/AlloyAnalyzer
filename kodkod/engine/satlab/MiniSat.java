@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@ package kodkod.engine.satlab;
 
 
 /**
- * Java wrapper for Niklas EŽn and Niklas Sšrensson MiniSAT solver.
+ * Java wrapper for the MiniSat solver by Niklas E&eacute;n and Niklas S&ouml;rensson.
  * @author Emina Torlak
  */
 final class MiniSat extends NativeSolver {
@@ -36,7 +36,7 @@ final class MiniSat extends NativeSolver {
 	}
 	
 	static {
-		loadLibrary("minisat");
+		loadLibrary(MiniSat.class);
 	}
 
 	

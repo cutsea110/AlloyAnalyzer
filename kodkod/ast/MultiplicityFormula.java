@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,8 +43,8 @@ public final class MultiplicityFormula extends Formula {
      * Constructs a new multiplicity formula:  multiplicity expression
      * 
      * @ensures this.expression' = expression && this.multiplicity' = multiplicity
-     * @throws NullPointerException - multiplicity = null || expression = null
-     * @throws IllegalArgumentException - multiplicity = SET
+     * @throws NullPointerException  multiplicity = null || expression = null
+     * @throws IllegalArgumentException  multiplicity = SET
      */
     MultiplicityFormula(Multiplicity multiplicity, Expression expression) {
     		if (multiplicity==Multiplicity.SET) throw new IllegalArgumentException("invalid expression mulitplicity: SET");

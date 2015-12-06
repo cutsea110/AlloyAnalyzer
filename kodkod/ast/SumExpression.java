@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,7 @@ public final class SumExpression extends IntExpression {
 	/**
 	 * Constructs a sum expression
 	 * @ensures this.decls' = decls && this.intExpr' = intExpr
-	 * @throws IllegalArgumentException - some d: decls.children | d.multiplicty != ONE
+	 * @throws IllegalArgumentException  some d: decls.children | d.multiplicty != ONE
 	 */
 	SumExpression(Decls decls, IntExpression intExpr) {
 		for(Decl d : decls) {

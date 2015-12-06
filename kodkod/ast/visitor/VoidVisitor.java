@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ import kodkod.ast.ConstantFormula;
 import kodkod.ast.Decl;
 import kodkod.ast.Decls;
 import kodkod.ast.ExprToIntCast;
+import kodkod.ast.FixFormula;
 import kodkod.ast.IfExpression;
 import kodkod.ast.IfIntExpression;
 import kodkod.ast.IntComparisonFormula;
@@ -50,56 +51,56 @@ import kodkod.ast.UnaryExpression;
 import kodkod.ast.UnaryIntExpression;
 import kodkod.ast.Variable;
 
-/** 
+/**
  * A visitor that visits every node in the AST.
  *
- * @author Emina Torlak  
+ * @author Emina Torlak
  */
 public interface VoidVisitor {
 
-	/** 
-	 * Visits the given sequence of declarations. 
+	/**
+	 * Visits the given sequence of declarations.
 	 **/
     public void visit(Decls decls);
-    /** 
+    /**
 	 * Visits the given declaration.
 	 **/
     public void visit(Decl decl);
-    
-    /** 
-	 * Visits the given relation. 
+
+    /**
+	 * Visits the given relation.
 	 **/
     public void visit(Relation relation);
-    /** 
-	 * Visits the given variable. 
+    /**
+	 * Visits the given variable.
 	 **/
     public void visit(Variable variable);
-    /** 
-	 * Visits the given constant expression. 
+    /**
+	 * Visits the given constant expression.
 	 **/
     public void visit(ConstantExpression constExpr);
-    
-    /** 
-	 * Visits the given unary expression. 
+
+    /**
+	 * Visits the given unary expression.
 	 **/
-    public void visit(UnaryExpression unaryExpr);   
-    
-    /** 
-	 * Visits the given binary expression. 
+    public void visit(UnaryExpression unaryExpr);
+
+    /**
+	 * Visits the given binary expression.
 	 **/
     public void visit(BinaryExpression binExpr);
-    
-    /** 
+
+    /**
 	 * Visits the given nary expression.
 	 **/
     public void visit(NaryExpression expr);
-    
-  
-    /** 
-	 * Visits the given comprehension. 
+
+
+    /**
+	 * Visits the given comprehension.
 	 **/
     public void visit(Comprehension comprehension);
-    /** 
+    /**
 	 * Visits the given if-then expression.
 	 **/
     public void visit(IfExpression ifExpr);
@@ -107,8 +108,8 @@ public interface VoidVisitor {
      * Visits the given projection expression.
      */
     public void visit(ProjectExpression project);
-    
-    
+
+
     /**
      * Visits the given integer cast expression.
      */
@@ -125,7 +126,7 @@ public interface VoidVisitor {
      * Visits the given if-int-expression.
      */
     public void visit(IfIntExpression intExpr);
-    /** 
+    /**
 	 * Visits the given nary int expression.
 	 **/
     public void visit(NaryIntExpression intExpr);
@@ -145,33 +146,33 @@ public interface VoidVisitor {
      * Visits the given integer comparison formula.
      */
     public void visit(IntComparisonFormula intComp);
-    
-    /** 
-	 * Visits the given quantified formula. 
+
+    /**
+	 * Visits the given quantified formula.
 	 **/
     public void visit(QuantifiedFormula quantFormula);
-    /** 
+    /**
 	 * Visits the given nary formula.
 	 **/
     public void visit(NaryFormula formula);
-    /** 
+    /**
 	 * Visits the given binary formula.
 	 **/
     public void visit(BinaryFormula binFormula);
-    /** 
-	 * Visits the given negation. 
+    /**
+	 * Visits the given negation.
 	 **/
     public void visit(NotFormula not);
-    /** 
-	 * Visits the given constant formula. 
+    /**
+	 * Visits the given constant formula.
 	 **/
     public void visit(ConstantFormula constant);
-    
-    /** 
+
+    /**
 	 * Visits the given comparison formula.
 	 **/
     public void visit(ComparisonFormula compFormula);
-    /** 
+    /**
 	 * Visits the given multiplicity formula.
 	 **/
     public void visit(MultiplicityFormula multFormula);
@@ -179,5 +180,6 @@ public interface VoidVisitor {
      * Visits the given relation predicate.
      */
     public void visit(RelationPredicate predicate);
-    
+    public void visit(FixFormula fixFormula);
+
 }

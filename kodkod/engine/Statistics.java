@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,16 +30,19 @@ import kodkod.engine.fol2sat.Translation;
  * @specfield bounds: Bounds // the bounds on the formula
  */
 public final class Statistics {
-	
+
 	private static final String NEW_LINE = System.getProperty("line.separator");
-	
+
 	private final int vars, pVars, clauses;
-	private final long translation, solving; 
-	
+	private final long translation, solving;
+
+	private long procTranslTime = 0;
+	private int numCandidates = 1;
+
 	/**
 	 * Constructs a new Statistics object using the provided values.
 	 */
-	Statistics(int primaryVariables, int variables, int clauses, 
+	Statistics(int primaryVariables, int variables, int clauses,
 			   long translationTime, long solvingTime) {
 		this.pVars = primaryVariables;
 		this.vars = variables;
@@ -47,17 +50,17 @@ public final class Statistics {
 		this.translation = translationTime;
 		this.solving = solvingTime;
 	}
-	
+
 	/**
 	 * Constructs a new Statistics object using the provided values.
 	 */
-	Statistics(Translation translation, long translationTime, long solvingTime) { 
-		this(translation.numPrimaryVariables(), translation.cnf().numberOfVariables(), 
+	Statistics(Translation translation, long translationTime, long solvingTime) {
+		this(translation.numPrimaryVariables(), translation.cnf().numberOfVariables(),
 				translation.cnf().numberOfClauses(), translationTime, solvingTime);
 	}
-	
+
 	/**
-	 * Returns the number of variables needed 
+	 * Returns the number of variables needed
 	 * to encode this.formula in CNF.
 	 * @return the number of variables needed
 	 * to encode this.formula in CNF.
@@ -65,7 +68,7 @@ public final class Statistics {
 	public int variables() {
 		return vars;
 	}
-	
+
 	/**
 	 * Returns the number of primary variables
 	 * used in the encoding of this.formula; i.e. the variables
@@ -77,9 +80,9 @@ public final class Statistics {
 	public int primaryVariables() {
 		return pVars;
 	}
-	
+
 	/**
-	 * Returns the number of clauses needed to 
+	 * Returns the number of clauses needed to
 	 * encode this.formula in CNF.
 	 * @return the number of variables needed
 	 * to encode this.formula in CNF.
@@ -87,7 +90,7 @@ public final class Statistics {
 	public int clauses() {
 		return clauses;
 	}
-	
+
 	/**
 	 * Returns the number of miliseconds spent
 	 * on translation this.formula to CNF.
@@ -97,7 +100,7 @@ public final class Statistics {
 	public long translationTime() {
 		return translation;
 	}
-	
+
 	/**
 	 * Returns the number of miliseconds spent
 	 * on solving the CNF encoding of this.formula.
@@ -107,7 +110,12 @@ public final class Statistics {
 	public long solvingTime() {
 		return solving;
 	}
-	
+
+	public void setProcTranslTime(long procTranslTime) { this.procTranslTime = procTranslTime; }
+	public void setNumCandidates(int numCandidates)    { this.numCandidates = numCandidates; }
+    public long procTranslTime()                       { return this.procTranslTime; }
+    public int numCandidates()                         { return this.numCandidates; }
+
 	/**
 	 * Returns a string representation of this
 	 * Statistics object.
@@ -132,4 +140,5 @@ public final class Statistics {
 		ret.append(" ms");
 		return ret.toString();
 	}
+
 }

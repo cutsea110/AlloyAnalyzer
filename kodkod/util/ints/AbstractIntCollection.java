@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -66,7 +66,7 @@ public abstract class AbstractIntCollection implements IntCollection {
 	 * if this.iterator() does not support removal.
 	 * @ensures iterates through the elements of this and removes i if it finds it
 	 * @return true if this collection has changed as a result of the call 
-	 * @throws UnsupportedOperationException - this.iterator() does not support removal
+	 * @throws UnsupportedOperationException  this.iterator() does not support removal
 	 */
 	public boolean remove(int i) {
 		for(IntIterator iter = iterator(); iter.hasNext(); ) {

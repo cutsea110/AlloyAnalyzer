@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -52,7 +52,7 @@ public final class IntTreeSet extends AbstractIntSet implements Cloneable {
 	 * Constructs a new int set containing the elements
 	 * in the specified set.
 	 * @ensures this.ints' = s.ints
-	 * @throws NullPointerException - s = null
+	 * @throws NullPointerException  s = null
 	 */
 	public IntTreeSet(IntSet s) {
 		this();
@@ -63,7 +63,6 @@ public final class IntTreeSet extends AbstractIntSet implements Cloneable {
 	 * Copy constructor.
 	 * @ensures constructs a deep copy of the original set.
 	 */
-	@SuppressWarnings("unchecked")
 	private IntTreeSet(IntTreeSet original) {
 		this.size = original.size;
 		try {
@@ -112,7 +111,7 @@ public final class IntTreeSet extends AbstractIntSet implements Cloneable {
 	 * Returns the smallest element in this set.
 	 * Throws a NoSuchElementException if this set is empty.
 	 * @return min(this.ints)
-	 * @throws java.util.NoSuchElementException - no this.ints
+	 * @throws java.util.NoSuchElementException  no this.ints
 	 * @see kodkod.util.ints.IntSet#min()
 	 */
 	@Override
@@ -125,7 +124,7 @@ public final class IntTreeSet extends AbstractIntSet implements Cloneable {
 	 * Returns the largest element in this set.
 	 * Throws a NoSuchElementException if this set is empty.
 	 * @return max(this.ints)
-	 * @throws java.util.NoSuchElementException - no this.ints
+	 * @throws java.util.NoSuchElementException  no this.ints
 	 * @see kodkod.util.ints.IntSet#max()
 	 */
 	@Override
@@ -260,7 +259,6 @@ public final class IntTreeSet extends AbstractIntSet implements Cloneable {
 	 * @return a copy of this IntSet.
 	 * @see kodkod.util.ints.IntSet#clone()
 	 */
-	@SuppressWarnings("unchecked")
 	@Override
 	public IntTreeSet clone() {
 		// ok to use copy constructor to clone a final class

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -107,9 +107,9 @@ public final class HomogenousSequence<V> extends AbstractSparseSequence<V> {
 	 * returned sequence is backed by a {@link IntTreeSet IntTreeSet} instance.
 	 * @requires one seq.entries[int]
 	 * @ensures this.value' = seq.entries[int] && this.indices' = seq.indices()
-	 * @throws NullPointerException - seq = null
-	 * @throws IllegalArgumentException - seq.isEmpty()
-	 * @throws IllegalArgumentException - #seq.entries[int] > 1
+	 * @throws NullPointerException  seq = null
+	 * @throws IllegalArgumentException  seq.isEmpty()
+	 * @throws IllegalArgumentException  #seq.entries[int] > 1
 	 */
 	public HomogenousSequence(SparseSequence<? extends V> seq) {
 		if (seq.isEmpty())
@@ -181,7 +181,7 @@ public final class HomogenousSequence<V> extends AbstractSparseSequence<V> {
 	 * @requires this.value = value
 	 * @ensures this.indices' = this.indices + index
 	 * @return this.entries[index]
-	 * @throws IllegalArgumentException - this.value != value
+	 * @throws IllegalArgumentException  this.value != value
 	 * @see kodkod.util.ints.SparseSequence#put(int, Object)
 	 */
 	public V put(int index, V value) {

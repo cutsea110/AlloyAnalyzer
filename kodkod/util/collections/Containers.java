@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@ import java.util.AbstractSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -43,8 +44,9 @@ public final class Containers {
 	 * The iterator is backed by the given array.  The contents
 	 * of the array are not modified by the iterator.  The effect
 	 * of this method is the same as calling Iterators.iterator(0, items.length, items).
-	 * @throws NullPointerException - items = null
+	 * @throws NullPointerException  items = null
 	 */
+	@SafeVarargs
 	public static final <T, E extends T> Iterator<T> iterate(final E... items) {
 		return new AscendingArrayIterator<T>(0, items.length, items);
 	}
@@ -57,11 +59,11 @@ public final class Containers {
 	 * indeces start, inclusive, and end, exclusive.  If start < end,
 	 * the elements are returned in the ascending order; otherwise,
 	 * they are returned in the descending order.
-	 * @throws NullPointerException - items = null
-	 * @throws IllegalArgumentException - start < end && (start < 0 || end > items.length) ||
+	 * @throws NullPointerException  items = null
+	 * @throws IllegalArgumentException  start < end && (start < 0 || end > items.length) ||
 	 *                                    start > end && (start >= items.length || end < -1)
 	 */
-	@SuppressWarnings("unchecked")
+	@SafeVarargs
 	public static final <T, E extends T> Iterator<T> iterate(int start, int end, final E... items) {
 		if (start < end)
 			return new AscendingArrayIterator<T>(start,end,items);
@@ -310,6 +312,16 @@ public final class Containers {
 	}
 	
 	/**
+	 * Returns a new set that contains the asymmetric difference between the left and the right sets.
+	 * @return some s: Set<T> | s.elements = left.elements - right.elements
+	 */
+	public static final <T> Set<T> setDifference(Set<T> left, Set<T> right) { 
+		final Set<T> ret = new LinkedHashSet<T>(left);
+		ret.removeAll(right);
+		return ret;
+	}
+	
+	/**
 	 * An unmodifying iterator over an array.
 	 */
 	private static abstract class ArrayIterator<T> implements Iterator<T> {
@@ -327,6 +339,7 @@ public final class Containers {
 		 *           start < end => end in [0..items.length] && start in [0..end], 
 		 *                          start in [0..items.length) && end in [-1..start]
 		 */
+		@SafeVarargs
 		<E extends T> ArrayIterator(int start, int end, final E... items) {
 			this.items = items;
 			this.cursor = start;
@@ -346,7 +359,7 @@ public final class Containers {
 		/**
 		 * Constructs a new iterator over the given array of items.
 		 * @requires items != null && start < end 
-		 * @throws IllegalArgumentException - start < 0 || end > items.length
+		 * @throws IllegalArgumentException  start < 0 || end > items.length
 		 */
 		<E extends T> AscendingArrayIterator(int start, int end, E[] items) {
 			super(start, end, items);
@@ -372,7 +385,7 @@ public final class Containers {
 		/**
 		 * Constructs a new iterator over the given array of items.
 		 * @requires items != null && start > end 
-		 * @throws IllegalArgumentException - start >= items.length || end < -1
+		 * @throws IllegalArgumentException  start >= items.length || end < -1
 		 */
 		<E extends T> DescendingArrayIterator(int start, int end, E[] items) {
 			super(start, end, items);

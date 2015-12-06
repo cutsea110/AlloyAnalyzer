@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -45,8 +45,8 @@ public final class ComparisonFormula extends Formula{
      * Constructs a new comparison formula: left op  right
      * 
      * @ensures this.left' = left && this.right' = right && this.op' = op
-     * * @throws NullPointerException - left = null || right = null || op = null
-     * @throws IllegalArgumentException - left.arity != right.arity
+     * * @throws NullPointerException  left = null || right = null || op = null
+     * @throws IllegalArgumentException  left.arity != right.arity
      */
     ComparisonFormula(Expression left, ExprCompOperator op, Expression right) {
         if (left.arity()!=right.arity()) {

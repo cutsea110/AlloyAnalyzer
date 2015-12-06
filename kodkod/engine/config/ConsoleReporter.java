@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,9 @@ import kodkod.ast.Decl;
 import kodkod.ast.Formula;
 import kodkod.ast.Relation;
 import kodkod.engine.bool.BooleanFormula;
+import kodkod.engine.hol.HOLTranslation;
 import kodkod.instance.Bounds;
+import kodkod.instance.Instance;
 import kodkod.util.ints.IntSet;
 
 /**
@@ -38,24 +40,17 @@ import kodkod.util.ints.IntSet;
  * @author Emina Torlak
  */
 public final class ConsoleReporter implements Reporter {
-	
+
 	/**
 	 * Constructs a new instance of the ConsoleReporter.
 	 */
 	public ConsoleReporter() {}
-	
+
 	/**
 	 * @see kodkod.engine.config.Reporter#generatingSBP()
 	 */
 	public void generatingSBP() {
 		System.out.println("generating lex-leader symmetry breaking predicate ...");
-	}
-
-	/**
-	 * @see kodkod.engine.config.Reporter#flattening(kodkod.engine.bool.BooleanFormula)
-	 */
-	public void flattening(BooleanFormula circuit) {
-		System.out.println("flattening ...");
 	}
 
 	/**
@@ -81,22 +76,22 @@ public final class ConsoleReporter implements Reporter {
 	public void detectingSymmetries(Bounds bounds){
 		System.out.println("detecting symmetries ...");
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 * @see kodkod.engine.config.Reporter#detectedSymmetries(java.util.Set)
 	 */
 	public void detectedSymmetries(Set<IntSet> parts) {
-//		System.out.println("detected symmetries: " + parts);
+		System.out.println("detected " + parts.size() + " equivalence classes of atoms ...");
 	}
-	
+
 	/**
 	 * @see kodkod.engine.config.Reporter#optimizingBoundsAndFormula()
 	 */
 	public void optimizingBoundsAndFormula() {
 		System.out.println("optimizing bounds and formula (breaking predicate symmetries, inlining, skolemizing) ...");
 	}
-	
+
 	/**
 	 * @see kodkod.engine.config.Reporter#translatingToBoolean(kodkod.ast.Formula, kodkod.instance.Bounds)
 	 */
@@ -110,7 +105,7 @@ public final class ConsoleReporter implements Reporter {
 	public void translatingToCNF(BooleanFormula circuit) {
 		System.out.println("translating to cnf ...");
 	}
-	
+
 	/**
 	 * @see java.lang.Object#toString()
 	 */
@@ -118,6 +113,89 @@ public final class ConsoleReporter implements Reporter {
 		return "ConsoleReporter";
 	}
 
-	
+    @Override
+    public void convertingToNNF() {
+        System.out.println("converting to nnf ...");
+
+    }
+
+    @Override
+    public void holLoopStart(HOLTranslation tr, Formula formula, Bounds bounds) {
+        System.out.println(String.format("starting higher-order (%s) search ...", tr));
+    }
+
+    @Override
+    public void holCandidateFound(HOLTranslation tr, Instance candidate) {
+    	System.out.println(String.format("  [%s] candidate found", tr));
+    }
+
+    @Override
+    public void holVerifyingCandidate(HOLTranslation tr, Instance candidate, Formula checkFormula, Bounds bounds) {
+        System.out.println(String.format("  [%s]   verifying candidate", tr));
+    }
+
+    @Override
+    public void holCandidateVerified(HOLTranslation tr, Instance candidate) {
+        System.out.println(String.format("  [%s]   candidate verified", tr));
+    }
+
+    @Override
+    public void holCandidateNotVerified(HOLTranslation tr, Instance candidate, Instance cex) {
+        System.out.println(String.format("  [%s]   counterexample found", tr));
+    }
+
+    @Override
+    public void holFindingNextCandidate(HOLTranslation tr, Formula inc) {
+        System.out.println(String.format("  [%s] continuing cegis loop", tr.getClass()));
+    }
+
+	@Override
+	public void holSplitStart(HOLTranslation tr, Formula formula) {
+        System.out.println(String.format("starting split (%s) ...", tr));
+	}
+
+	@Override
+	public void holSplitChoice(HOLTranslation tr, Formula formula, Bounds bounds) {
+		System.out.println(String.format("  [%s] trying choice", tr));
+	}
+
+	@Override
+	public void holSplitChoiceSAT(HOLTranslation tr, Instance interpret) {
+		System.out.println(String.format("  [%s] choice SAT", tr));
+	}
+
+	@Override
+	public void holSplitChoiceUNSAT(HOLTranslation tr) {
+		System.out.println(String.format("  [%s] choice UNSAT", tr));
+	}
+
+    @Override
+    public void holFixpointStart(HOLTranslation tr, Formula formula, Bounds bounds) {
+        System.out.println(String.format("  [%s] fixpoint search started", tr));
+    }
+
+    @Override
+    public void holFixpointNoSolution(HOLTranslation tr) {
+        System.out.println(String.format("  [%s]   no solution", tr));
+    }
+
+    @Override
+    public void holFixpointFirstSolution(HOLTranslation tr, Instance candidate) {
+        System.out.println(String.format("  [%s]   first solution found", tr));
+    }
+
+    @Override
+    public void holFixpointIncrementing(HOLTranslation tr, Formula inc) {
+        System.out.println(String.format("  [%s]   hill climbing", tr));
+    }
+
+    @Override
+    public void holFixpointIncrementingOutcome(HOLTranslation tr, Instance next) {
+        if (next != null)
+            System.out.println(String.format("  [%s]   climbed one step", tr));
+        else
+            System.out.println(String.format("  [%s]   fixpoint reached", tr));
+    }
+
 
 }

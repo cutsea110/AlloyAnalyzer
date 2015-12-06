@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -64,7 +64,7 @@ public final class LinkedStack<T> extends  Stack<T> {
 	 * @ensures this.size' = this.size - 1 && 
 	 *          all i: [1..this.size) | this.elems'[i-1] = this.elems[i]
 	 * @return this.elems[0]
-	 * @throws EmptyStackException - no this.elems
+	 * @throws EmptyStackException  no this.elems
 	 */
 	public T pop() {
 		if (head==null) throw new EmptyStackException();
@@ -77,7 +77,7 @@ public final class LinkedStack<T> extends  Stack<T> {
 	/**
 	 * Looks at the object at the top of this stack without removing it from the stack.
 	 * @return this.elems[0]
-	 * @throws EmptyStackException - no this.elems
+	 * @throws EmptyStackException  no this.elems
 	 */
 	public T peek() {
 		if (head==null) throw new EmptyStackException();
@@ -152,7 +152,6 @@ public final class LinkedStack<T> extends  Stack<T> {
 	 * @specfield data: T
 	 * @specfield next: StackEntry<T>
 	 */
-	@SuppressWarnings("hiding")
 	private static final class StackEntry<T> {
 		T data;
 		StackEntry<T> next;

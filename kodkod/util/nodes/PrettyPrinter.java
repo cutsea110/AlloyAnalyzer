@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,7 @@ import kodkod.ast.Decl;
 import kodkod.ast.Decls;
 import kodkod.ast.ExprToIntCast;
 import kodkod.ast.Expression;
+import kodkod.ast.FixFormula;
 import kodkod.ast.Formula;
 import kodkod.ast.IfExpression;
 import kodkod.ast.IfIntExpression;
@@ -67,7 +68,7 @@ import kodkod.ast.visitor.VoidVisitor;
 
 /**
  * Pretty-prints Kodkod nodes.
- * 
+ *
  * @author Emina Torlak
  */
 public final class PrettyPrinter {
@@ -76,74 +77,74 @@ public final class PrettyPrinter {
 	 * Returns a dot representation of the given node that can be visualized with GraphViz.
 	 * @return a dot representation of the given node that can be visualized with GraphViz.
 	 */
-	public static String dotify(Node node) { 
+	public static String dotify(Node node) {
 		return Dotifier.apply(node);
 	}
 	/**
-	 * Returns a pretty-printed string representation of the 
+	 * Returns a pretty-printed string representation of the
 	 * given node, with each line offset by at least the given
 	 * number of whitespaces.  The line parameter determines the
 	 * length of each pretty-printed line, including the offset.
 	 * @requires 0 <= offset < line
-	 * @return a pretty-printed string representation of the 
+	 * @return a pretty-printed string representation of the
 	 * given node
 	 */
-	public static String print(Node node, int offset, int line) { 
+	public static String print(Node node, int offset, int line) {
 		final Formatter formatter = new Formatter(offset,line);
 		node.accept(formatter);
 		return formatter.tokens.toString();
 	}
-	
+
 	/**
-	 * Returns a pretty-printed string representation of the 
+	 * Returns a pretty-printed string representation of the
 	 * given node, with each line offset by at least the given
-	 * number of whitespaces.  
+	 * number of whitespaces.
 	 * @requires 0 <= offset < 80
-	 * @return a pretty-printed string representation of the 
+	 * @return a pretty-printed string representation of the
 	 * given node
 	 */
-	public static String print(Node node, int offset) { 
+	public static String print(Node node, int offset) {
 		return print(node,offset,80);
 	}
-	
+
 	/**
-	 * Returns a pretty-printed string representation of the 
+	 * Returns a pretty-printed string representation of the
 	 * given formulas, with each line offset by at least the given
-	 * number of whitespaces.  
+	 * number of whitespaces.
 	 * @requires 0 <= offset < 80
-	 * @return a pretty-printed string representation of the 
+	 * @return a pretty-printed string representation of the
 	 * given formulas
 	 */
-	public static String print(Set<Formula> formulas, int offset) { 
+	public static String print(Set<Formula> formulas, int offset) {
 		return print(formulas,offset,80);
 	}
-	
+
 	/**
-	 * Returns a pretty-printed string representation of the 
+	 * Returns a pretty-printed string representation of the
 	 * given formulas, with each line offset by at least the given
 	 * number of whitespaces.  The line parameter determines the
 	 * length of each pretty-printed line, including the offset.
 	 * @requires 0 <= offset < line
-	 * @return a pretty-printed string representation of the 
+	 * @return a pretty-printed string representation of the
 	 * given formulas
 	 */
-	public static String print(Set<Formula> formulas, int offset, int line) { 
+	public static String print(Set<Formula> formulas, int offset, int line) {
 		final Formatter formatter = new Formatter(offset,line);
-		for(Formula f : formulas) { 
+		for(Formula f : formulas) {
 			f.accept(formatter);
 			formatter.newline();
 		}
 		return formatter.tokens.toString();
 	}
-	
-	
-	
+
+
+
 	/**
 	 * Generates a buffer of tokens comprising the string representation
-	 * of a given node.  The buffer contains at least the parentheses 
+	 * of a given node.  The buffer contains at least the parentheses
 	 * needed to correctly represent the node's tree structure.
-	 * 
-	 * @specfield tokens: seq<Object> 
+	 *
+	 * @specfield tokens: seq<Object>
 	 * @author Emina Torlak
 	 */
 	private static class Formatter implements VoidVisitor {
@@ -151,7 +152,7 @@ public final class PrettyPrinter {
 		//final int offset;
 		private final int lineLength;
 		private int indent, lineStart;
-		
+
 		/**
 		 * Constructs a new tokenizer.
 		 * @ensures no this.tokens
@@ -165,57 +166,57 @@ public final class PrettyPrinter {
 			this.indent = offset;
 			indent();
 		}
-		
+
 		/*--------------FORMATTERS---------------*/
-		
-			
+
+
 		/** @ensures this.tokens' = concat [ this.tokens, " ", token, " " ]*/
-		private void infix(Object token) { 
+		private void infix(Object token) {
 			space();
 			tokens.append(token);
 			space();
 		}
-		
+
 		/** @ensures this.tokens' = concat [ this.tokens, token, " " ]*/
-		private void keyword(Object token) { 
+		private void keyword(Object token) {
 			append(token);
 			space();
 		}
-		
+
 		/** @ensures this.tokens' = concat [ this.tokens, ", " ]*/
-		private void comma() { 
-			tokens.append(","); 
-			space(); 
+		private void comma() {
+			tokens.append(",");
+			space();
 		}
-		
+
 		/** @ensures this.tokens' = concat [ this.tokens, ": " ]*/
-		private void colon() { 
-			tokens.append(":"); 
-			space(); 
+		private void colon() {
+			tokens.append(":");
+			space();
 		}
-		
+
 		/** @ensures adds this.indent spaces to this.tokens */
 		private void indent() { for(int i = 0; i < indent; i++) { space(); } }
-		
+
 		/** @ensures adds newline plus this.indent spaces to this.tokens */
-		private void newline() { 
+		private void newline() {
 			tokens.append("\n");
 			lineStart = tokens.length();
 			indent();
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens,  " " ] **/
 		private void space() { tokens.append(" "); }
-	
+
 		/** @ensures this.tokens' = concat [ this.tokens, token ]*/
-		private void append(Object token) { 
+		private void append(Object token) {
 			final String str = String.valueOf(token);
 			if ((tokens.length() - lineStart + str.length()) > lineLength) {
 				newline();
 			}
 			tokens.append(str);
 		}
-		
+
 		/*--------------LEAVES---------------*/
 		/** @ensures this.tokens' = concat[ this.tokens, node ] */
 		public void visit(Relation node) { append(node); }
@@ -225,17 +226,17 @@ public final class PrettyPrinter {
 
 		/** @ensures this.tokens' = concat[ this.tokens, node ] */
 		public void visit(ConstantExpression node) { append(node); }
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, node ] */
 		public void visit(IntConstant node) { append(node); }
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, node ] */
 		public void visit(ConstantFormula node) { append(node); }
-		
+
 		/*--------------DECLARATIONS---------------*/
-		/** 
-		 * @ensures this.tokens' = 
-		 *   concat[ this.tokens, tokenize[ node.variable ], ":", tokenize[ node.expression ] 
+		/**
+		 * @ensures this.tokens' =
+		 *   concat[ this.tokens, tokenize[ node.variable ], ":", tokenize[ node.expression ]
 		 **/
 		public void visit(Decl node) {
 			node.variable().accept(this);
@@ -246,75 +247,75 @@ public final class PrettyPrinter {
 			}
 			node.expression().accept(this);
 		}
-		
-		/** 
-		 * @ensures this.tokens' = 
-		 *   concat[ this.tokens, tokenize[ node.declarations[0] ], ",", 
-		 *    ..., tokenize[ node.declarations[ node.size() - 1 ] ] ] 
+
+		/**
+		 * @ensures this.tokens' =
+		 *   concat[ this.tokens, tokenize[ node.declarations[0] ], ",",
+		 *    ..., tokenize[ node.declarations[ node.size() - 1 ] ] ]
 		 **/
 		public void visit(Decls node) {
 			Iterator<Decl> decls = node.iterator();
 			decls.next().accept(this);
-			while(decls.hasNext()) { 
+			while(decls.hasNext()) {
 				comma();
 				decls.next().accept(this);
 			}
 		}
-		
+
 		/*--------------UNARY NODES---------------*/
-		
-		/** @ensures this.tokenize' = 
-		 *   (parenthesize => concat [ this.tokens, "(", tokenize[child], ")" ] else 
+
+		/** @ensures this.tokenize' =
+		 *   (parenthesize => concat [ this.tokens, "(", tokenize[child], ")" ] else
 		 *                    concat [ this.tokens, tokenize[child] ]*/
-		private void visitChild(Node child, boolean parenthesize) { 
+		private void visitChild(Node child, boolean parenthesize) {
 			if (parenthesize) { append("("); }
 			child.accept(this);
 			if (parenthesize) { append(")"); }
 		}
-		
-		/** @return true if the given expression should be parenthesized when a 
+
+		/** @return true if the given expression should be parenthesized when a
 		 * child of a compound parent */
-		private boolean parenthesize(Expression child) { 
-			return child instanceof BinaryExpression || child instanceof IfExpression; 
+		private boolean parenthesize(Expression child) {
+			return child instanceof BinaryExpression || child instanceof IfExpression;
 		}
-		
-		/** @return true if the given expression should be parenthesized when a 
+
+		/** @return true if the given expression should be parenthesized when a
 		 * child of a compound parent */
-		private boolean parenthesize(IntExpression child) { 
-			return !(child instanceof UnaryIntExpression || 
-					 child instanceof IntConstant || 
-					 child instanceof ExprToIntCast); 
+		private boolean parenthesize(IntExpression child) {
+			return !(child instanceof UnaryIntExpression ||
+					 child instanceof IntConstant ||
+					 child instanceof ExprToIntCast);
 		}
-		
-		/** @return true if the given formula should be parenthesized when a 
+
+		/** @return true if the given formula should be parenthesized when a
 		 * child of a compound parent */
-		private boolean parenthesize(Formula child) { 
-			return !(child instanceof NotFormula || child instanceof ConstantFormula || 
+		private boolean parenthesize(Formula child) {
+			return !(child instanceof NotFormula || child instanceof ConstantFormula ||
 					 child instanceof RelationPredicate);
 		}
-		
-		/** @ensures appends the given op and child to this.tokens; the child is 
+
+		/** @ensures appends the given op and child to this.tokens; the child is
 		 * parenthesized if it's an instance of binary expression or an if expression. **/
-		public void visit(UnaryExpression node) { 
+		public void visit(UnaryExpression node) {
 			append(node.op());
 			visitChild(node.expression(), parenthesize(node.expression()));
 		}
-		
-		
-		/** @ensures appends the given op and child to this.tokens; the child is 
+
+
+		/** @ensures appends the given op and child to this.tokens; the child is
 		 * parenthesized if it's not an instance of unary int expression or int constant. **/
-		public void visit(UnaryIntExpression node)  { 
+		public void visit(UnaryIntExpression node)  {
 			final IntExpression child = node.intExpr();
 			final IntOperator op = node.op();
-			final boolean parens = 
-				(op==IntOperator.ABS) || (op==IntOperator.SGN) || 
+			final boolean parens =
+				(op==IntOperator.ABS) || (op==IntOperator.SGN) ||
 				parenthesize(child);
 			append(node.op());
 			visitChild(child, parens);
 		}
-		
-		/** @ensures appends the given op and child to this.tokens; the child is 
-		 * parenthesized if it's not an instance of not formula, constant formula, or 
+
+		/** @ensures appends the given op and child to this.tokens; the child is
+		 * parenthesized if it's not an instance of not formula, constant formula, or
 		 * relation predicate. **/
 		public void visit(NotFormula node) {
 			append("!");
@@ -323,26 +324,26 @@ public final class PrettyPrinter {
 			visitChild(node.formula(), parenthesize(node.formula()));
 			indent -= pchild ? 2 : 1;
 		}
-		
-		/** @ensures appends the given op and child to this.tokens; the child is 
+
+		/** @ensures appends the given op and child to this.tokens; the child is
 		 * parenthesized if it's an instance of binary expression or an if expression. **/
 		public void visit(MultiplicityFormula node) {
 			keyword(node.multiplicity());
 			visitChild(node.expression(), parenthesize(node.expression()));
 		}
-		
+
 		/*--------------BINARY NODES---------------*/
-		
-		/** @return true if the given  expression needs to be parenthesized if a 
+
+		/** @return true if the given  expression needs to be parenthesized if a
 		 * child of a binary  expression with the given operator */
-		private boolean parenthesize(ExprOperator op, Expression child) { 
+		private boolean parenthesize(ExprOperator op, Expression child) {
 			return child instanceof IfExpression ||
 				   child instanceof NaryExpression ||
-			       (child instanceof BinaryExpression && 
-			        (op==ExprOperator.JOIN || 
+			       (child instanceof BinaryExpression &&
+			        (op==ExprOperator.JOIN ||
 			         ((BinaryExpression)child).op()!=op));
 		}
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(BinaryExpression node) {
 			final ExprOperator op = node.op();
@@ -350,27 +351,27 @@ public final class PrettyPrinter {
 			infix(op);
 			visitChild(node.right(), parenthesize(op, node.right()));
 		}
-		
-		
+
+
 
 		/** @return true if the given operator is assocative */
-		private boolean associative(IntOperator op) { 
-			switch(op) { 
+		private boolean associative(IntOperator op) {
+			switch(op) {
 			case DIVIDE : case MODULO : case SHA : case SHL : case SHR : return false;
 			default : return true;
 			}
 		}
-		
-		/** @return true if the given int expression needs to be parenthesized if a 
+
+		/** @return true if the given int expression needs to be parenthesized if a
 		 * child of a binary int expression with the given operator */
-		private boolean parenthesize(IntOperator op, IntExpression child) { 
+		private boolean parenthesize(IntOperator op, IntExpression child) {
 			return child instanceof SumExpression ||
-				   child instanceof IfIntExpression || 
+				   child instanceof IfIntExpression ||
 				   child instanceof NaryIntExpression ||
-			       (child instanceof BinaryIntExpression && 
+			       (child instanceof BinaryIntExpression &&
 			        (!associative(op) || ((BinaryIntExpression)child).op()!=op));
 		}
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(BinaryIntExpression node) {
 			final IntOperator op = node.op();
@@ -378,17 +379,17 @@ public final class PrettyPrinter {
 			infix(op);
 			visitChild(node.right(), parenthesize(op, node.right()));
 		}
-		
-		/** @return true if the given formula needs to be parenthesized if a 
+
+		/** @return true if the given formula needs to be parenthesized if a
 		 * child of a binary formula with the given operator */
-		private boolean parenthesize(FormulaOperator op, Formula child) { 
-			return child instanceof QuantifiedFormula || 
+		private boolean parenthesize(FormulaOperator op, Formula child) {
+			return child instanceof QuantifiedFormula ||
 				   //child instanceof NaryFormula ||
-			       (child instanceof BinaryFormula && 
-			        (op==FormulaOperator.IMPLIES || 
+			       (child instanceof BinaryFormula &&
+			        (op==FormulaOperator.IMPLIES ||
 			         ((BinaryFormula)child).op()!=op));
 		}
-	
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(BinaryFormula node) {
 			final FormulaOperator op = node.op();
@@ -403,23 +404,23 @@ public final class PrettyPrinter {
 			visitChild(node.right(), pright);
 			if (pright) indent--;
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, tokenize[node.left], node.op, tokenize[node.right] */
 		public void visit(ComparisonFormula node) {
 			visitChild(node.left(), parenthesize(node.left()));
 			infix(node.op());
 			visitChild(node.right(), parenthesize(node.right()));
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, tokenize[node.left], node.op, tokenize[node.right] */
 		public void visit(IntComparisonFormula node) {
 			visitChild(node.left(), parenthesize(node.left()));
 			infix(node.op());
 			visitChild(node.right(), parenthesize(node.right()));
 		}
-		
+
 		/*--------------TERNARY NODES---------------*/
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(IfExpression node) {
 			visitChild(node.condition(), parenthesize(node.condition()));
@@ -432,7 +433,7 @@ public final class PrettyPrinter {
 			visitChild(node.elseExpr(), parenthesize(node.elseExpr()));
 			indent--;
 		}
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(IfIntExpression node) {
 			visitChild(node.condition(), parenthesize(node.condition()));
@@ -445,18 +446,18 @@ public final class PrettyPrinter {
 			visitChild(node.elseExpr(), parenthesize(node.elseExpr()));
 			indent--;
 		}
-		
+
 		/*--------------VARIABLE CREATOR NODES---------------*/
-		/** @ensures this.tokens' = concat[ this.tokens, 
+		/** @ensures this.tokens' = concat[ this.tokens,
 		 *   "{", tokenize[node.decls], "|", tokenize[ node.formula ], "}" ]*/
 		public void visit(Comprehension node) {
 			append("{");
 			node.decls().accept(this);
 			infix("|");
 			node.formula().accept(this);
-			append("}");	
+			append("}");
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens,  "sum",
 		 *   tokenize[node.decls], "|", tokenize[ node.intExpr ],  ]*/
 		public void visit(SumExpression node) {
@@ -465,21 +466,52 @@ public final class PrettyPrinter {
 			infix("|");
 			node.intExpr().accept(this);
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens,  node.quantifier,
 		 *   tokenize[node.decls], "|", tokenize[ node.formula ] ]*/
 		public void visit(QuantifiedFormula node) {
 			keyword(node.quantifier());
 			node.decls().accept(this);
-			infix("|");
-			indent++;
-			newline();
-			node.formula().accept(this);
-			indent--;
+			if (node.domain() != Formula.TRUE) {
+    			infix("| domain{");
+    			indent++;
+    			newline();
+    			node.domain().accept(this);
+    			indent--;
+    			newline();
+    			infix("}");
+    			infix("| body{");
+                indent++;
+                newline();
+                node.body().accept(this);
+                indent--;
+                newline();
+                infix("}");
+			} else {
+			    infix("|");
+	            indent++;
+	            newline();
+	            node.body().accept(this);
+	            indent--;
+			}
 		}
-		
+
+	    public void visit(FixFormula node) {
+	        keyword("fix {"); newline();
+	        indent++;
+	        node.formula().accept(this);
+	        newline();
+	        indent--;
+	        append("} until {"); newline();
+	        indent++;
+	        node.condition().accept(this);
+	        newline();
+	        indent--;
+	        append("}");
+	    }
+
 		/*--------------NARY NODES---------------*/
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(NaryExpression node) {
 			final ExprOperator op = node.op();
@@ -505,7 +537,7 @@ public final class PrettyPrinter {
 			if (parens) indent++;
 			visitChild(node.child(0), parens);
 			if (parens) indent--;
-			for(int i = 1, size = node.size(); i < size; i++) { 
+			for(int i = 1, size = node.size(); i < size; i++) {
 				infix(op);
 				newline();
 				parens = parenthesize(op, node.child(i));
@@ -515,7 +547,7 @@ public final class PrettyPrinter {
 			}
 		}
 		/*--------------OTHER NODES---------------*/
-		
+
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(ProjectExpression node) {
 			append("project");
@@ -525,14 +557,14 @@ public final class PrettyPrinter {
 			append("<");
 			final Iterator<IntExpression> cols = node.columns();
 			cols.next().accept(this);
-			while(cols.hasNext()) { 
+			while(cols.hasNext()) {
 				comma();
 				cols.next().accept(this);
 			}
 			append(">");
 			append("]");
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, "Int","[",
 		 *   tokenize[node.intExpr], "]" ] **/
 		public void visit(IntToExprCast node) {
@@ -541,18 +573,18 @@ public final class PrettyPrinter {
 			node.intExpr().accept(this);
 			append("]");
 		}
-		
+
 		/** @ensures this.tokens' = concat[ this.tokens, "int","[",
 		 *   tokenize[node.expression], "]" ] **/
 		public void visit(ExprToIntCast node) {
-			switch(node.op()) { 
+			switch(node.op()) {
 			case SUM:
 				append("int");
 				append("[");
 				node.expression().accept(this);
 				append("]");
 				break;
-			case CARDINALITY : 
+			case CARDINALITY :
 				append("#");
 				append("(");
 				node.expression().accept(this);
@@ -560,19 +592,19 @@ public final class PrettyPrinter {
 				break;
 			default : throw new IllegalArgumentException("unknown operator: " + node.op());
 			}
-			
+
 		}
 
 		/** @ensures appends the tokenization of the given node to this.tokens */
 		public void visit(RelationPredicate node) {
-			switch(node.name()) { 
-			case ACYCLIC : 
+			switch(node.name()) {
+			case ACYCLIC :
 				append("acyclic");
 				append("[");
 				node.relation().accept(this);
 				append("]");
 				break;
-			case FUNCTION : 
+			case FUNCTION :
 				RelationPredicate.Function func = (RelationPredicate.Function)node;
 				append("function");
 				append("[");
@@ -584,7 +616,7 @@ public final class PrettyPrinter {
 				func.range().accept(this);
 				append("]");
 				break;
-			case TOTAL_ORDERING : 
+			case TOTAL_ORDERING :
 				RelationPredicate.TotalOrdering ord = (RelationPredicate.TotalOrdering)node;
 				append("ord");
 				append("[");
@@ -600,33 +632,33 @@ public final class PrettyPrinter {
 			default:
 				throw new AssertionError("unreachable");
 			}
-			
+
 		}
-		
+
 	}
-	
+
 	private static class Dotifier implements VoidVisitor {
 		private final StringBuilder graph = new StringBuilder();
 		private final Map<Node,Integer> ids = new LinkedHashMap<Node, Integer>();
-		
-		static String apply(Node node) { 
+
+		static String apply(Node node) {
 			final Dotifier dot = new Dotifier();
 			dot.graph.append("digraph {\n");
 			node.accept(dot);
 			dot.graph.append("}");
 			return dot.graph.toString();
 		}
-		
-		
+
+
 		private  boolean visited(Node n)  {
 			if (ids.containsKey(n)) return true;
 			ids.put(n, ids.size());
 			return false;
 		}
-		
+
 		private String id(Node n) { return "N" + ids.get(n); }
-		
-		private void node(Node n, String label) { 
+
+		private void node(Node n, String label) {
 			graph.append(id(n));
 			graph.append("[ label=\"" );
 			graph.append(ids.get(n));
@@ -634,49 +666,49 @@ public final class PrettyPrinter {
 			graph.append(label);
 			graph.append(")\"];\n");
 		}
-		
-		private void edge(Node n1, Node n2) { 
+
+		private void edge(Node n1, Node n2) {
 			if (n2 instanceof LeafExpression || n2 instanceof ConstantFormula || n2 instanceof IntConstant) {
-				
+
 			}
 			graph.append(id(n1));
 			graph.append("->");
 			graph.append(id(n2));
 			graph.append(";\n");
 		}
-		
-		private void visit(Node parent, Object label) { 
+
+		private void visit(Node parent, Object label) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
 		}
-		
+
 		private void visit(Node parent, Object label, Node child) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
 			child.accept(this);
-			edge(parent, child);	
+			edge(parent, child);
 		}
-		
+
 		private void visit(Node parent, Object label, Node left, Node right) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
 			left.accept(this);
 			right.accept(this);
-			edge(parent, left);	
+			edge(parent, left);
 			edge(parent, right);
 		}
-		
+
 		private void visit(Node parent, Object label, Node left, Node middle, Node right) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
 			left.accept(this);
 			middle.accept(this);
 			right.accept(this);
-			edge(parent, left);	
-			edge(parent, middle);	
+			edge(parent, left);
+			edge(parent, middle);
 			edge(parent, right);
 		}
-		
+
 		private void visit(Node parent, Object label, Iterator<? extends Node> children) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
@@ -686,7 +718,7 @@ public final class PrettyPrinter {
 				edge(parent, child);
 			}
 		}
-		
+
 		private void visit(Node parent, Object label, Node child, Iterator<? extends Node> children) {
 			if (visited(parent)) return;
 			node(parent, label.toString());
@@ -698,26 +730,26 @@ public final class PrettyPrinter {
 				edge(parent, other);
 			}
 		}
-		
+
 		public void visit(Decls decls) { visit(decls, "decls", decls.iterator()); }
-		
+
 		public void visit(Decl decl) { visit(decl, "decl", decl.variable(), decl.expression()); }
-		
+
 		public void visit(Relation relation) { visit(relation, relation.name()); }
-		public void visit(Variable variable) { visit(variable, variable.name()); }	
+		public void visit(Variable variable) { visit(variable, variable.name()); }
 		public void visit(ConstantExpression constExpr) { visit(constExpr, constExpr.name()); }
-		
-		
-		public void visit(NaryExpression expr) { 
-			visit(expr, expr.op(), expr.iterator()); 
+
+
+		public void visit(NaryExpression expr) {
+			visit(expr, expr.op(), expr.iterator());
 		}
-		public void visit(BinaryExpression binExpr) { 
-			visit(binExpr, binExpr.op(), binExpr.left(), binExpr.right()); 
+		public void visit(BinaryExpression binExpr) {
+			visit(binExpr, binExpr.op(), binExpr.left(), binExpr.right());
 		}
-		public void visit(UnaryExpression unaryExpr) { 
-			visit(unaryExpr, unaryExpr.op(), unaryExpr.expression()); 
+		public void visit(UnaryExpression unaryExpr) {
+			visit(unaryExpr, unaryExpr.op(), unaryExpr.expression());
 		}
-		public void visit(Comprehension comprehension) { 
+		public void visit(Comprehension comprehension) {
 			visit(comprehension, "setcomp", comprehension.decls(), comprehension.formula());
 		}
 		public void visit(IfExpression ifExpr) {
@@ -726,10 +758,10 @@ public final class PrettyPrinter {
 		public void visit(ProjectExpression project) {
 			visit(project, "proj", project.expression(), project.columns());
 		}
-		
+
 		public void visit(IntToExprCast castExpr) { visit(castExpr, castExpr.op(), castExpr.intExpr()); }
 		public void visit(IntConstant intConst) { visit(intConst, intConst.value()); }
-		
+
 		public void visit(IfIntExpression intExpr) {
 			visit(intExpr, "ite", intExpr.condition(), intExpr.thenExpr(), intExpr.elseExpr());
 		}
@@ -738,22 +770,23 @@ public final class PrettyPrinter {
 		public void visit(BinaryIntExpression intExpr) { visit(intExpr, intExpr.op(), intExpr.left(), intExpr.right()); }
 		public void visit(UnaryIntExpression intExpr) { visit(intExpr, intExpr.op(), intExpr.intExpr());}
 		public void visit(SumExpression intExpr) { visit(intExpr, "sum", intExpr.decls(), intExpr.intExpr()); }
-		
+
 		public void visit(IntComparisonFormula intComp) { visit(intComp, intComp.op(), intComp.left(), intComp.right());}
-		public void visit(QuantifiedFormula quantFormula) { 
+		public void visit(QuantifiedFormula quantFormula) {
 			visit(quantFormula, quantFormula.quantifier(), quantFormula.decls(), quantFormula.formula());
 		}
+		public void visit(FixFormula fixFormula) { visit(fixFormula, "fix", fixFormula.formula(), fixFormula.condition()); }
 		public void visit(NaryFormula formula) { visit(formula, formula.op(), formula.iterator()); }
 		public void visit(BinaryFormula binFormula) { visit(binFormula, binFormula.op(), binFormula.left(), binFormula.right()); }
 		public void visit(NotFormula not) { visit(not, "not", not.formula()); }
 		public void visit(ConstantFormula constant) { visit(constant, constant.booleanValue()); }
 		public void visit(ComparisonFormula compFormula) { visit(compFormula, compFormula.op(), compFormula.left(), compFormula.right());}
-		public void visit(MultiplicityFormula multFormula) { 
+		public void visit(MultiplicityFormula multFormula) {
 			visit(multFormula, multFormula.multiplicity(), multFormula.expression());
 		}
 		public void visit(RelationPredicate pred) {
 			if (visited(pred)) return;
-			
+
 			if (pred.name()==RelationPredicate.Name.FUNCTION) {
 				final RelationPredicate.Function fp = (RelationPredicate.Function) pred;
 				visit(fp, fp.name(),  fp.domain(), fp.range() );
@@ -764,6 +797,6 @@ public final class PrettyPrinter {
 				throw new IllegalArgumentException("Unknown predicate: " + pred);
 			}
 		}
-		
+
 	}
 }

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -120,7 +120,7 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * Returns the given node's predecessor, if it exists.  
 	 * Otherwise returns null.  
 	 * @return the given node's predecessor
-	 * @throws NullPointerException - node = null
+	 * @throws NullPointerException  node = null
 	 */
 	final N predecessor(N node) {
 		if (node.left != null) {
@@ -141,7 +141,7 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * Returns the given node's successor, if it exists.  
 	 * Otherwise returns null.
 	 * @return the given node's successor
-	 * @throws NullPointerException - node = null
+	 * @throws NullPointerException  node = null
 	 */
 	final N successor(N node) {
 		if (node.right != null) {
@@ -215,7 +215,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * @ensures this.nodes' = this.nodes - o + n
 	 * @ensures o.parent' = o.left' = o.right' = null
 	 */
-	@SuppressWarnings("unchecked")
 	final void replace(N o, N n) {
 		n.color = o.color;
 		n.parent = o.parent;
@@ -240,7 +239,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * @requires no z.key & this.nodes.key
 	 * @ensures this.nodes' = this.nodes + z
 	 */
-	@SuppressWarnings("unchecked")
 	final void insert(N z) {
 		N y = null;
 		for (N x = root; x != null;) {
@@ -269,7 +267,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * @requires z in this.nodes
 	 * @ensures this.nodes' = this.nodes - z
 	 */
-	@SuppressWarnings("unchecked")
 	final void delete(N z) {
 		N y = (z.left==null || z.right==null ? z : successor(z));
 		N x = (y.left != null ? y.left : y.right);
@@ -310,10 +307,10 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	/**
 	 * {@inheritDoc}
 	 * @see java.lang.Object#clone()
-	 * @throws CloneNotSupportedException - nodes contained in this tree are not cloneable
+	 * @throws CloneNotSupportedException  nodes contained in this tree are not cloneable
 	 */
 	@SuppressWarnings("unchecked")
-	protected IntTree clone() throws CloneNotSupportedException {
+	protected IntTree<N> clone() throws CloneNotSupportedException {
 		final IntTree<N> ret = (IntTree<N>) super.clone();
 		ret.root = clone(root, null);
 		return ret;
@@ -336,7 +333,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	/**
 	 * From CLR.
 	 */
-	@SuppressWarnings("unchecked")
 	private void insertFixUp(N z) {
 		while (z != null && z != root && z.parent.color == RED) {
 			if (parentOf(z) == leftOf(parentOf(parentOf(z)))) {
@@ -381,7 +377,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	/**
 	 * From CLR.
 	 */
-	@SuppressWarnings("unchecked")
 	private void deleteFixUp(N x) {
 		while (x != root && colorOf(x) == BLACK) {
 			if (x == leftOf(parentOf(x))) {
@@ -448,7 +443,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	/**
 	 * From CLR.
 	 */
-	@SuppressWarnings("unchecked")
 	private void rotateLeft(N x) {
 		N y = x.right;
 		x.right = y.left;
@@ -468,7 +462,6 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	/**
 	 * From CLR.
 	 */
-	@SuppressWarnings("unchecked")
 	private void rotateRight(N x) {
 		N y = x.left;
 		x.left = y.right;  
@@ -503,8 +496,8 @@ final class IntTree<N extends IntTree.Node<N>> implements Cloneable {
 	 * @author Emina Torlak
 	 */
 	abstract static class Node<N extends Node<N>> implements Cloneable {
-		private N parent, left, right;
-		private boolean color;
+		N parent, left, right;
+		boolean color;
 		/**
 		 * Subclasses are required to maintain the following invariant:
 		 * @invariant 	this = this.parent.left => this.key < this.parent.key &&

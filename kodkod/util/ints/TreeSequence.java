@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -48,7 +48,6 @@ public final class TreeSequence<V> extends AbstractSparseSequence<V>
 	 * Copy constructor.
 	 * @ensures creatres a deep copy of the original
 	 */
-	@SuppressWarnings("unchecked")
 	private TreeSequence(TreeSequence<V> original) {
 		this.size = original.size;
 		try {
@@ -173,7 +172,6 @@ public final class TreeSequence<V> extends AbstractSparseSequence<V>
 	 * @return a copy of this sparse sequence.
 	 * @see kodkod.util.ints.SparseSequence#clone()
 	 */
-	@SuppressWarnings("unchecked")
 	public TreeSequence<V> clone() {
 		// ok to use copy constructor to clone a final class
 		return new TreeSequence<V>(this);
@@ -225,7 +223,6 @@ public final class TreeSequence<V> extends AbstractSparseSequence<V>
 			return key + "=" + value;
 		}		
 		
-		@SuppressWarnings("unchecked")
 		protected Entry<V> clone() throws CloneNotSupportedException {
 			return (Entry<V>)super.clone();
 		}

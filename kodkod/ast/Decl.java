@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -51,8 +51,8 @@ public final class Decl extends Decls {
      * expression, with the specified order.
      * 
      * @ensures this.variable' = variable && this.expression' = expression && this.multiplicity' = mult
-     * @throws NullPointerException - variable = null || expression = null || mult = null
-     * @throws IllegalArgumentException - variable.arity != expression.arity 
+     * @throws NullPointerException  variable = null || expression = null || mult = null
+     * @throws IllegalArgumentException  variable.arity != expression.arity 
      */
     Decl(Variable variable, Multiplicity mult, Expression expression) {
    		if (mult==Multiplicity.NO)

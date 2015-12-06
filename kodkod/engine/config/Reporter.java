@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,9 @@ import kodkod.ast.Decl;
 import kodkod.ast.Formula;
 import kodkod.ast.Relation;
 import kodkod.engine.bool.BooleanFormula;
+import kodkod.engine.hol.HOLTranslation;
 import kodkod.instance.Bounds;
+import kodkod.instance.Instance;
 import kodkod.util.ints.IntSet;
 
 /**
@@ -40,12 +42,11 @@ import kodkod.util.ints.IntSet;
  * <li>bounds and formula optimization (breaking of predicate symmetries, predicate inlining and skolemization)</li>
  * <li>translation to a boolean circuit</li>
  * <li>symmetry breaking predicate (SBP) generation</li>
- * <li>circuit flattening</li>
  * <li>translation to cnf</li>
  * <li>running a sat solver on the generated cnf</li>
  * </ol>
- * Some of these stages may not be executed, depending on the 
- * {@link Options options} used for analysis.  
+ * Some of these stages may not be executed, depending on the
+ * {@link Options options} used for analysis.
  * @author Emina Torlak
  */
 public interface Reporter {
@@ -55,54 +56,69 @@ public interface Reporter {
 	 * The given bounds must not be mutated.
 	 */
 	public void detectingSymmetries(Bounds bounds);
-	
+
 	/**
 	 * Reports the symmetry partitions that were detected.
 	 * The given partitions must not be mutated.
 	 */
 	public void detectedSymmetries(Set<IntSet> parts);
-	
+
 	/**
 	 * Reports that bounds optimization is in progress (stage 2).
 	 */
 	public void optimizingBoundsAndFormula();
-		
+
 	/**
-	 * Reports that the given declaration is being skolemized using the 
-	 * given skolem relation.  The context list contains non-skolemizable 
+	 * Reports that the given declaration is being skolemized using the
+	 * given skolem relation.  The context list contains non-skolemizable
 	 * quantified declarations on which the given decl depends, in the order of declaration
 	 * (most recent decl is last in the list).
 	 */
 	public void skolemizing(Decl decl, Relation skolem, List<Decl> context);
-	
+
 	/**
 	 * Reports that the analysis of the given (optimized) formula
 	 * and bounds is in stage 3.  The given bounds must not be mutated.
 	 * @ensures bounds' = bounds
 	 */
 	public void translatingToBoolean(Formula formula, Bounds bounds);
-	
+
 	/**
 	 * Reports that the analysis is in stage 4.
 	 */
 	public void generatingSBP();
 
-	/**
-	 * Reports that the stage 5 of the analysis is
-	 * being performed on the given boolean formula.
-	 */
-	public void flattening(BooleanFormula circuit);
-	
+
 	/**
 	 * Reports that the given (optimized)
-	 * circuit is being translated to CNF (stage 6 of the analysis).
+	 * circuit is being translated to CNF (stage 5 of the analysis).
 	 */
 	public void translatingToCNF(BooleanFormula circuit);
-	
+
 	/**
-	 * Reports that the cnf generated in stage 7, consisting of the
+	 * Reports that the cnf generated in stage 6, consisting of the
 	 * given number of variables and clauses, is being analyzed by
-	 * a sat solver (stage 8 of the analysis).
+	 * a sat solver (stage 7 of the analysis).
 	 */
 	public void solvingCNF(int primaryVars, int vars, int clauses);
+
+	public void convertingToNNF();
+
+    public void holLoopStart(HOLTranslation tr, Formula formula, Bounds bounds);
+    public void holCandidateFound(HOLTranslation tr, Instance candidate);
+    public void holVerifyingCandidate(HOLTranslation tr, Instance candidate, Formula checkFormula, Bounds bounds);
+    public void holCandidateVerified(HOLTranslation tr, Instance candidate);
+    public void holCandidateNotVerified(HOLTranslation tr, Instance candidate, Instance cex);
+    public void holFindingNextCandidate(HOLTranslation tr, Formula inc);
+
+    public void holFixpointStart(HOLTranslation tr, Formula formula, Bounds bounds);
+    public void holFixpointNoSolution(HOLTranslation tr);
+    public void holFixpointFirstSolution(HOLTranslation tr, Instance candidate);
+    public void holFixpointIncrementing(HOLTranslation tr, Formula inc);
+    public void holFixpointIncrementingOutcome(HOLTranslation tr, Instance next);
+
+	public void holSplitStart(HOLTranslation tr, Formula formula);
+	public void holSplitChoice(HOLTranslation tr, Formula formula, Bounds bounds);
+	public void holSplitChoiceSAT(HOLTranslation tr, Instance inst);
+	public void holSplitChoiceUNSAT(HOLTranslation tr);
 }

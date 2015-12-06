@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -163,7 +163,7 @@ final class FOL2BoolCache {
 		 * this.translation.  Otherwise returns null.  
 		 * @requires all v: varBinding.int | some e.lookup(v)
 		 * @return all v: varBinding.int | e.lookup(v).get(varBinding[v])=TRUE => this.translation, null
-		 * @throws NullPointerException - e = null
+		 * @throws NullPointerException  e = null
 		 */
 		abstract Object get(Environment<BooleanMatrix, Expression> e);
 		

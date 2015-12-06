@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -131,7 +131,7 @@ public final class NotGate extends BooleanFormula {
 	/**
 	 * Returns this.input[i].
 	 * @return this.input[i]
-	 * @throws IndexOutOfBoundsException - i != 0
+	 * @throws IndexOutOfBoundsException  i != 0
 	 */
 	@Override
 	public BooleanFormula input(int i) {

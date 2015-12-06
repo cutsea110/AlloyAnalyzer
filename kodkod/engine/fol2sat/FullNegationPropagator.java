@@ -1,4 +1,4 @@
-/* 
+/*
  * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -36,6 +36,7 @@ import java.util.Set;
 import kodkod.ast.BinaryFormula;
 import kodkod.ast.ComparisonFormula;
 import kodkod.ast.ConstantFormula;
+import kodkod.ast.FixFormula;
 import kodkod.ast.Formula;
 import kodkod.ast.IntComparisonFormula;
 import kodkod.ast.MultiplicityFormula;
@@ -45,29 +46,30 @@ import kodkod.ast.NotFormula;
 import kodkod.ast.QuantifiedFormula;
 import kodkod.ast.RelationPredicate;
 import kodkod.ast.operator.FormulaOperator;
+import kodkod.ast.operator.Quantifier;
 import kodkod.ast.visitor.AbstractVoidVisitor;
+import kodkod.engine.config.Reporter;
 import kodkod.util.nodes.AnnotatedNode;
 
 /**
  * Propagates negations all the way down to the leafs, but without crossing
  * quantification boundaries.  It also eliminates negations wherever possible
- * (e.g. double negation, !(a>b) --> a<=b, etc.) 
- *  
- * Breaks up all implications (=>) and two-way implications (<=>), so that 
- * the resulting formula only contains the following boolean operators: 
+ * (e.g. double negation, !(a>b) --> a<=b, etc.)
+ *
+ * Breaks up all implications (=>) and two-way implications (<=>), so that
+ * the resulting formula only contains the following boolean operators:
  * AND (&&), OR (||), and NOT (!) at the leaf positions.
  */
-final class FullNegationPropagator extends AbstractVoidVisitor {
+public final class FullNegationPropagator extends AbstractVoidVisitor {
 
-    /**
-     * 
-     */
-    public static AnnotatedNode<Formula> flatten(AnnotatedNode<Formula> annotated) {  
+    public static AnnotatedNode<Formula> toNNF(AnnotatedNode<Formula> annotated) { return toNNF(annotated, null); }
+    public static AnnotatedNode<Formula> toNNF(AnnotatedNode<Formula> annotated, Reporter reporter) {
+        if (reporter != null) reporter.convertingToNNF();
         final FullNegationPropagator flat = new FullNegationPropagator(annotated.sharedNodes());
         annotated.node().accept(flat);
         final List<Formula> roots = new ArrayList<Formula>(flat.annotations.size());
         roots.addAll(flat.annotations.keySet());
-        for(Iterator<Map.Entry<Formula,Node>> itr = flat.annotations.entrySet().iterator(); itr.hasNext(); ) { 
+        for(Iterator<Map.Entry<Formula,Node>> itr = flat.annotations.entrySet().iterator(); itr.hasNext(); ) {
             final Map.Entry<Formula, Node> entry = itr.next();
             final Node source = annotated.sourceOf(entry.getValue());
             if (entry.getKey()==source)     { itr.remove(); /* TODO: what is this for? */ }
@@ -75,37 +77,37 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
         }
         return AnnotatedNode.annotate(Formula.and(flat.conjuncts), flat.annotations);
     }
-    
-    private List<Formula> conjuncts; 
+
+    private List<Formula> conjuncts;
     private  Map<Formula, Node> annotations;
     private final Map<Node,Boolean> visited;
     private final Set<Node> shared;
     private boolean negated;
     private boolean hasChanged;
-    
+
     /**
      * Constructs a flattener for a formula in which the given nodes are shared.
      */
     private FullNegationPropagator(Set<Node> shared) {
         this(shared, new LinkedHashMap<Formula, Node>(), new IdentityHashMap<Node,Boolean>());
     }
-    
-    private FullNegationPropagator(Set<Node> shared, Map<Formula, Node> annotations, Map<Node, Boolean> visited) { 
+
+    private FullNegationPropagator(Set<Node> shared, Map<Formula, Node> annotations, Map<Node, Boolean> visited) {
         this.conjuncts = new LinkedList<Formula>();
         this.annotations = annotations;
         this.shared = shared;
         this.visited = visited;
         this.negated = false;
     }
-    
+
     /**
      * {@inheritDoc}
      * @see kodkod.ast.visitor.AbstractVoidVisitor#visited(kodkod.ast.Node)
      */
     @Override
-    protected boolean visited(Node n) { 
-        if (shared.contains(n)) { 
-            if (visited.containsKey(n)) { 
+    protected boolean visited(Node n) {
+        if (shared.contains(n)) {
+            if (visited.containsKey(n)) {
                 final Boolean val = visited.get(n);
                 if (val==null || val.booleanValue()==negated) {
                     return true;
@@ -119,8 +121,8 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
             }
         }
         return false;
-    }    
-    
+    }
+
     /**
      * Calls nf.formula.accept(this) after flipping the negation flag.
      * @see kodkod.ast.visitor.AbstractVoidVisitor#visit(kodkod.ast.NotFormula)
@@ -135,31 +137,16 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
             addConjunct(Formula.and(fne.conjuncts), false, nf);
             hasChanged = true;
         } else {
-            addConjunct(nf);            
+            addConjunct(nf);
         }
     }
-    
-    /**
-     * Adds the given formula (or its negation, depending on the value of the negated flag)
-     * to this.conjuncts.
-     */
-    private final void addConjunct(Formula conjunct) { 
-        Formula f = negated ? conjunct.not() : conjunct;
-        conjuncts.add(f);
-        annotations.put(f, conjunct);
-    }    
-    private final void addConjunct(Formula conjunct, boolean neg, Node source) { 
-        Formula f = neg ? conjunct.not() : conjunct;
-        conjuncts.add(f);
-        annotations.put(f, source);
-    }
-    
+
     /**
      * Visits the formula's children with appropriate settings
      * for the negated flag if bf  has not been visited before.
      * @see kodkod.ast.visitor.AbstractVoidVisitor#visit(kodkod.ast.BinaryFormula)
      */
-    public final void visit(BinaryFormula bf) { 
+    public final void visit(BinaryFormula bf) {
         if (visited(bf)) return;
         final FormulaOperator op = bf.op();
         switch (op) {
@@ -172,10 +159,10 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
                 // !(left && right) --> !left || !right
                 FullNegationPropagator fne1 = new FullNegationPropagator(shared, annotations, visited);
                 bf.left().not().accept(fne1);
-                
+
                 FullNegationPropagator fne2 = new FullNegationPropagator(shared, annotations, visited);
                 bf.right().not().accept(fne2);
-                
+
                 addConjunct(Formula.and(fne1.conjuncts).or(Formula.and(fne2.conjuncts)), false, bf);
                 hasChanged = true;
             }
@@ -185,10 +172,10 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
                 // left || right
                 FullNegationPropagator fne1 = new FullNegationPropagator(shared, annotations, visited);
                 bf.left().accept(fne1);
-                
+
                 FullNegationPropagator fne2 = new FullNegationPropagator(shared, annotations, visited);
                 bf.right().accept(fne2);
-                
+
                 if (!fne1.hasChanged && !fne2.hasChanged) {
                     addConjunct(bf);
                 } else {
@@ -207,10 +194,10 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
                 // left => right --> !left || right
                 FullNegationPropagator fne1 = new FullNegationPropagator(shared, annotations, visited);
                 bf.left().not().accept(fne1);
-                
+
                 FullNegationPropagator fne2 = new FullNegationPropagator(shared, annotations, visited);
                 bf.right().accept(fne2);
-                
+
                 addConjunct(Formula.and(fne1.conjuncts).or(Formula.and(fne2.conjuncts)), false, bf);
             } else {
                 // !(left => right) --> left && !right
@@ -221,7 +208,7 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
             }
             hasChanged = true;
             break;
-        case IFF: 
+        case IFF:
             FullNegationPropagator fne1 = new FullNegationPropagator(shared, annotations, visited);
             FullNegationPropagator fne2 = new FullNegationPropagator(shared, annotations, visited);
             if (!negated) {
@@ -238,25 +225,26 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
             break;
         default:
             addConjunct(bf);
-        } 
+        }
     }
-    
+
     /**
      * Visits the formula's children with appropriate settings
      * for the negated flag if bf  has not been visited before.
      * @see kodkod.ast.visitor.AbstractVoidVisitor#visit(kodkod.ast.NaryFormula)
      */
-    public final void visit(NaryFormula nf) { 
+    public final void visit(NaryFormula nf) {
         if (visited(nf)) return;
         final FormulaOperator op = nf.op();
-        if (negated && op==AND) {            
+        if (negated && op==AND) {
             List<Formula> formulas = new LinkedList<Formula>();
             for (Formula f : nf) {
                 FullNegationPropagator fne = new FullNegationPropagator(shared, annotations, visited);
-                f.not().accept(fne);    
+                f.not().accept(fne);
                 formulas.add(Formula.and(fne.conjuncts));
             }
             addConjunct(Formula.or(formulas), false, nf);
+            hasChanged = true;
         } else if (!negated && op==OR) {
             List<Formula> formulas = new LinkedList<Formula>();
             boolean changed = false;
@@ -272,45 +260,64 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
             } else {
                 addConjunct(nf);
             }
-        } else { 
-            for(Formula f : nf) { 
+        } else {
+            for(Formula f : nf) {
                 f.accept(this);
             }
+            hasChanged = negated;
         }
     }
-        
+
     /**
      * Adds f (resp. f.not()) to this.conjuncts if the negated flag is false (resp. true) and
      * the given node has not been visited; otherwise does nothing.
-     * @ensures !this.visited(f) => 
+     * @ensures !this.visited(f) =>
      *  (this.conjuncts' = conjuncts + (negated => f.not() else f)) else
-     *  (this.conjuncts' = this.conjuncts) 
+     *  (this.conjuncts' = this.conjuncts)
      */
-    final void visitFormula(Formula f) { 
+    final void visitFormula(Formula f) {
         if (visited(f)) return;
         addConjunct(f);
     }
-    
-    /**
-     * {@inheritDoc}
-     * @see kodkod.ast.visitor.AbstractVoidVisitor#visit(kodkod.ast.QuantifiedFormula)
-     */
+
     public final void visit(QuantifiedFormula qf) {
         if (visited(qf)) return;
-        FullNegationPropagator fne = new FullNegationPropagator(shared, annotations, visited);
-        qf.formula().accept(fne);
-        if (fne.hasChanged) {
-            Formula f = Formula.and(fne.conjuncts);
-            addConjunct(f.quantify(qf.quantifier(), qf.decls()), negated, qf);
+        FullNegationPropagator fneBody = new FullNegationPropagator(shared, annotations, visited);
+        fneBody.negated = negated;
+        boolean wasNegated = negated;
+        negated = false;
+        qf.body().accept(fneBody);
+
+        FullNegationPropagator fneDomain = new FullNegationPropagator(shared, annotations, visited);
+        qf.domain().accept(fneDomain);
+
+        if (fneBody.hasChanged || fneDomain.hasChanged || wasNegated) {
+            Formula qfBody = Formula.and(fneBody.conjuncts);
+            Quantifier quant = wasNegated ? qf.quantifier().opposite : qf.quantifier();
+            addConjunct(qfBody.quantify(quant, qf.decls(), Formula.and(fneDomain.conjuncts)), false, qf);
             hasChanged = true;
         } else {
             addConjunct(qf);
         }
+        negated = wasNegated;
     }
-    
+
+    public final void visit(FixFormula qf) {
+        addConjunct(qf);
+//        if (visited(qf)) return;
+//        if (!negated) {
+//            addConjunct(qf, false, qf);
+//        } else {
+//            negated = false;
+//            qf.formula().accept(this);
+//            hasChanged = true;
+//            negated = true;
+//        }
+    }
+
     /** @see #visitFormula(Formula) */
     public final void visit(ComparisonFormula cf) { visitFormula(cf); }
-    
+
     /** @see #visitFormula(Formula) */
     public final void visit(IntComparisonFormula cf) {
         if (visited(cf)) return;
@@ -342,19 +349,33 @@ final class FullNegationPropagator extends AbstractVoidVisitor {
                 addConjunct(cf.left().eq(cf.right()), false, cf);
                 hasChanged = true;
                 break;
-            default:   
+            default:
                 addConjunct(cf);
-            }            
+            }
         }
     }
-    
+
     /** @see #visitFormula(Formula) */
     public final void visit(MultiplicityFormula mf)     { visitFormula(mf); }
-    
+
     /** @see #visitFormula(Formula) */
     public final void visit(ConstantFormula constant)   { visitFormula(constant); }
 
     /** @see #visitFormula(Formula) */
     public final void visit(RelationPredicate pred)     { visitFormula(pred); }
+
+    /**
+     * Adds the given formula (or its negation, depending on the value of the negated flag)
+     * to this.conjuncts.
+     */
+    private final void addConjunct(Formula conjunct) {
+        addConjunct(conjunct, negated, conjunct);
+    }
+    private final void addConjunct(Formula conjunct, boolean neg, Node source) {
+        Formula f = neg ? not(conjunct) : conjunct;
+        conjuncts.add(f);
+        annotations.put(f, source);
+    }
+    private Formula not(Formula f) { return f instanceof NotFormula ? ((NotFormula)f).formula() : f.not();  }
 
 }

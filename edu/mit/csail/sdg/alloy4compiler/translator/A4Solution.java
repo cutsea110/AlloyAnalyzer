@@ -15,12 +15,13 @@
 
 package edu.mit.csail.sdg.alloy4compiler.translator;
 
-import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.UNIV;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.SIGINT;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.SEQIDX;
-import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.STRING;
 import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.NONE;
+import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.SEQIDX;
+import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.SIGINT;
+import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.STRING;
+import static edu.mit.csail.sdg.alloy4compiler.ast.Sig.UNIV;
 import static kodkod.engine.Solution.Outcome.UNSATISFIABLE;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -35,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import kodkod.ast.BinaryExpression;
 import kodkod.ast.BinaryFormula;
 import kodkod.ast.Decl;
@@ -66,6 +68,7 @@ import kodkod.instance.TupleFactory;
 import kodkod.instance.TupleSet;
 import kodkod.instance.Universe;
 import kodkod.util.ints.IndexedEntry;
+import edu.mit.csail.sdg.alloy4.A4Preferences;
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.ConstList;
 import edu.mit.csail.sdg.alloy4.ConstMap;
@@ -86,9 +89,9 @@ import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprVar;
 import edu.mit.csail.sdg.alloy4compiler.ast.Func;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
-import edu.mit.csail.sdg.alloy4compiler.ast.Type;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.Field;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig.PrimSig;
+import edu.mit.csail.sdg.alloy4compiler.ast.Type;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options.SatSolver;
 
 /** This class stores a SATISFIABLE or UNSATISFIABLE solution.
@@ -268,18 +271,24 @@ public final class A4Solution {
         int sym = (expected==1 ? 0 : opt.symmetry);
         solver = new Solver();
         solver.options().setNoOverflow(opt.noOverflow);
-        solver.options().setFlatten(false); // added for now, since multiplication and division circuit takes forever to flatten
+        //solver.options().setFlatten(false); // added for now, since multiplication and division circuit takes forever to flatten
         if (opt.solver.external()!=null) {
             String ext = opt.solver.external();
             if (opt.solverDirectory.length()>0 && ext.indexOf(File.separatorChar)<0) ext=opt.solverDirectory+File.separatorChar+ext;
             try {
                 File tmp = File.createTempFile("tmp", ".cnf", new File(opt.tempDirectory));
-                tmp.deleteOnExit(); 
-	            solver.options().setSolver(SATFactory.externalFactory(ext, tmp.getAbsolutePath(), "", opt.solver.options()));
+                tmp.deleteOnExit();
+	            solver.options().setSolver(SATFactory.externalFactory(ext, tmp.getAbsolutePath(), opt.solver.options()));
                 //solver.options().setSolver(SATFactory.externalFactory(ext, tmp.getAbsolutePath(), opt.solver.options()));
             } catch(IOException ex) { throw new ErrorFatal("Cannot create temporary directory.", ex); }
-        } else if (opt.solver.equals(A4Options.SatSolver.ZChaffJNI)) {
-            solver.options().setSolver(SATFactory.ZChaff);
+        } else if (opt.solver.equals(A4Options.SatSolver.LingelingJNI)) {
+            solver.options().setSolver(SATFactory.Lingeling);
+        } else if (opt.solver.equals(A4Options.SatSolver.PLingelingJNI)) {
+            solver.options().setSolver(SATFactory.plingeling(4, null));
+        } else if (opt.solver.equals(A4Options.SatSolver.GlucoseJNI)) {
+            solver.options().setSolver(SATFactory.Glucose);
+        } else if (opt.solver.equals(A4Options.SatSolver.CryptoMiniSatJNI)) {
+            solver.options().setSolver(SATFactory.CryptoMiniSat);
         } else if (opt.solver.equals(A4Options.SatSolver.MiniSatJNI)) {
             solver.options().setSolver(SATFactory.MiniSat);
         } else if (opt.solver.equals(A4Options.SatSolver.MiniSatProverJNI)) {
@@ -883,7 +892,7 @@ public final class A4Solution {
         final A4Options opt = originalOptions;
         long time = System.currentTimeMillis();
         rep.debug("Simplifying the bounds...\n");
-        if (simp!=null && formulas.size()>0 && !simp.simplify(rep, this, formulas)) addFormula(Formula.FALSE, Pos.UNKNOWN);
+        if (opt.inferPartialInstance && simp!=null && formulas.size()>0 && !simp.simplify(rep, this, formulas)) addFormula(Formula.FALSE, Pos.UNKNOWN);
         rep.translate(opt.solver.id(), bitwidth, maxseq, solver.options().skolemDepth(), solver.options().symmetryBreaking());
         Formula fgoal = Formula.and(formulas);
         rep.debug("Generating the solution...\n");
@@ -935,7 +944,7 @@ public final class A4Solution {
             rep.resultCNF(out);
             return null;
          }
-        if (solver.options().solver()==SATFactory.ZChaffMincost || !solver.options().solver().incremental()) {
+        if (!solver.options().solver().incremental() /* || solver.options().solver()==SATFactory.ZChaffMincost */) {
            if (sol==null) sol = solver.solve(fgoal, bounds);
         } else {
            kEnumerator = new Peeker<Solution>(solver.solveAll(fgoal, bounds));

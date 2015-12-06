@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,37 +26,37 @@ import kodkod.ast.operator.ExprOperator;
 import kodkod.ast.visitor.ReturnVisitor;
 import kodkod.ast.visitor.VoidVisitor;
 
-/** 
+/**
  * An {@link kodkod.ast.Expression expression} with one child.
- * 
+ *
  * @specfield expression: Expression
  * @specfield op: ExprOperator
  * @invariant op.unary()
  * @invariant children = 0->Expression
- * @author Emina Torlak 
+ * @author Emina Torlak
  */
 public final class UnaryExpression extends Expression {
     private final Expression expression;
     private final ExprOperator op;
     private final int arity;
-    
-    /**  
+
+    /**
      * Constructs a new unary expression: op expression
-     * 
+     *
      * @ensures this.expression' = expression && this.op' = op
-     * @throws NullPointerException - expression = null || op = null
-     * @throws IllegalArgumentException - op in {TRANSPOSE, CLOSURE, REFLEXIVE_CLOSURE} && child.arity != 2
+     * @throws NullPointerException  expression = null || op = null
+     * @throws IllegalArgumentException  op in {TRANSPOSE, CLOSURE, REFLEXIVE_CLOSURE} && child.arity != 2
      */
     UnaryExpression(ExprOperator op, Expression child) {
         if (!op.unary()) {
             throw new IllegalArgumentException("Not a unary operator: " + op);
         }
-        if (child.arity()!=2) {
+        if (child.arity()!=2 && op != ExprOperator.PRE) {
             throw new IllegalArgumentException("Invalid arity: " + child + "::" + child.arity());
         }
         this.expression = child;
         this.op = op;
-        this.arity = 2;
+        this.arity = child.arity();
     }
 
     /**
@@ -67,20 +67,20 @@ public final class UnaryExpression extends Expression {
     public int arity() {
         return arity;
     }
-    
+
     /**
      * Returns this.expression.
      * @return this.expression
      */
     public Expression expression() {return expression;}
-    
+
     /**
      * Returns this.op.
      * @return this.op
      */
     public ExprOperator op() {return op;}
-    
-    
+
+
 	/**
 	 * {@inheritDoc}
 	 * @see kodkod.ast.Expression#accept(kodkod.ast.visitor.ReturnVisitor)
@@ -100,9 +100,9 @@ public final class UnaryExpression extends Expression {
 	/**
 	 * {@inheritDoc}
 	 * @see kodkod.ast.Node#toString()
-	 */ 
+	 */
     public String toString() {
         return op.toString() + expression.toString();
-    }    
+    }
 
 }

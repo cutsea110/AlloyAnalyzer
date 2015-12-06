@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,8 +42,8 @@ public final class ExprToIntCast extends IntExpression {
 	 * Constructs a new cardinality expression.
 	 * 
 	 * @ensures this.expression' = expression && this.op' = op
-	 * @throws NullPointerException - expression = null || op = null
-	 * @throws IllegalArgumentException - op = SUM && child.arity != 1
+	 * @throws NullPointerException  expression = null || op = null
+	 * @throws IllegalArgumentException  op = SUM && child.arity != 1
 	 */
 	ExprToIntCast(Expression child, ExprCastOperator op) {
 		if (child.arity()>1 && op==ExprCastOperator.SUM) 

@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +21,11 @@
  */
 package kodkod.engine.satlab;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.sat4j.minisat.SolverFactory;
 
 /**
@@ -37,6 +42,30 @@ public abstract class SATFactory {
 	 * Constructs a new instance of SATFactory.
 	 */
 	protected SATFactory() {}
+	
+	/**
+	 * Returns true iff the given factory generates solvers that 
+	 * are available for use on this system.
+	 * @return true iff the given factory generates solvers that 
+	 * are available for use on this system.
+	 */
+	public static final boolean available(SATFactory factory) {
+		SATSolver solver = null;
+		try {
+			solver = factory.instance();
+			solver.addVariables(1);
+			solver.addClause(new int[]{1});
+			return solver.solve();
+		} catch (RuntimeException e) {
+			return false;
+		} catch (UnsatisfiedLinkError t) {    
+		    return false;
+		} finally {
+			if (solver!=null) {
+				solver.free();
+			}
+		}
+	}
 	
 	/**
 	 * The factory that produces instances of the default sat4j solver.
@@ -62,36 +91,14 @@ public abstract class SATFactory {
 	};
 	
 	/**
-	 * The factory that produces instances of the zchaff solver from Princeton; 
-	 * the returned instances 
-	 * support only basic sat solver operations (adding variables/clauses,
-	 * solving, and obtaining a satisfying solution, if any).  ZChaff is not incremental.
+	 * The factory that produces instances of Niklas E&eacute;n and Niklas S&ouml;rensson's
+	 * MiniSat solver.
 	 */
-	public static final SATFactory ZChaff = new SATFactory() {
-		public SATSolver instance() { 
-			return new ZChaff(); 
-		}
-		public boolean incremental() { return false; }
-		public String toString() { return "ZChaff"; }
-	};
-	
-	
-	
-	/**
-	 * The factory the produces {@link SATMinSolver cost-minimizing} 
-	 * instances of the zchaff solver from Princeton.  Note that cost minimization
-	 * can incur a time and/or memory overhead during solving,
-	 * so if you do not need this functionality, use the {@link #ZChaff} factory
-	 * instead.  ZChaffMincost is not incremental.
-	 */
-	public static final SATFactory ZChaffMincost = new SATFactory() {
+	public static final SATFactory MiniSat = new SATFactory() {
 		public SATSolver instance() {
-			return new ZChaffMincost();
+			return new MiniSat();
 		}
-		@Override
-		public boolean minimizer() { return true; }
-		public boolean incremental() { return false; }
-		public String toString() { return "ZChaffMincost"; }
+		public String toString() { return "MiniSat"; }
 	};
 	
 	/**
@@ -111,23 +118,105 @@ public abstract class SATFactory {
 	};
 	
 	/**
-	 * The factory that produces instances of Niklas E&eacute;n and Niklas S&ouml;rensson's
-	 * MiniSat solver.
+	 * The factory that produces instances of G. Audemard and L. Simon's 
+	 * Glucose solver.
 	 */
-	public static final SATFactory MiniSat = new SATFactory() {
+	public static final SATFactory Glucose = new SATFactory() {
 		public SATSolver instance() {
-			return new MiniSat();
+			return new Glucose();
 		}
-		public String toString() { return "MiniSat"; }
+		public String toString() { return "Glucose"; }
 	};
 	
-	public static final SATFactory MiniSatExternal = new SATFactory() {
-        public SATSolver instance() {
-            return new MiniSatExternal();
-        }
-        public String toString() { return "MiniSatExternal"; }
-    };
-    
+	/**
+	 * The factory that produces instances of the CryptoMiniSat solver by Mate Soos.
+	 */
+	public static final SATFactory CryptoMiniSat = new SATFactory() {
+		public SATSolver instance() {
+			return new CryptoMiniSat();
+		}
+		public String toString() { return "CryptoMiniSat"; }
+	};
+	
+	/**
+	 * The factory that produces instances of Armin Biere's
+	 * Lingeling solver.
+	 */
+	public static final SATFactory Lingeling = new SATFactory() {
+		public SATSolver instance() {
+			return new Lingeling();
+		}
+		public boolean incremental() { return false; }
+		public String toString() { return "Lingeling"; }
+	};
+	
+	/**
+	 * Returns a SATFactory that produces SATSolver wrappers for Armin Biere's Plingeling
+	 * solver.  This is a parallel solver that is invoked as an external program rather than 
+	 * via the Java Native Interface.  As a result, it cannot be used incrementally.  Its
+	 * external factory manages the creation and deletion of temporary files automatically.
+	 * A statically compiled version of plingeling is assumed to be available in a
+	 * java.library.path directory.  The effect of this method is the same as calling
+	 * {@link #plingeling(Integer, Boolean) plingeling(null, null)}.
+	 * @return  SATFactory that produces SATSolver wrappers for the Plingeling solver
+	 */
+	public static final SATFactory plingeling() {
+		return plingeling(null, null);
+	}
+	
+	/**
+	 * Returns a SATFactory that produces SATSolver wrappers for Armin Biere's Plingeling
+	 * solver.  This is a parallel solver that is invoked as an external program rather than 
+	 * via the Java Native Interface.  As a result, it cannot be used incrementally.  Its
+	 * external factory manages the creation and deletion of temporary files automatically.
+	 * A statically compiled version of plingeling is assumed to be available in a
+	 * java.library.path directory.  
+	 * 
+	 * <p>Plingling takes as input two optional parameters: {@code threads}, specifying how
+	 * many worker threads to use, and {@code portfolio}, specifying whether the threads should
+	 * run in portfolio mode (no sharing of clauses) or sharing mode. If {@code threads}
+	 * is null, the solver uses one worker per core.  If {@code portfolio} is null, it is set to 
+	 * true by default.</p>
+	 * 
+	 * @requires threads != null => numberOfThreads > 0
+	 * 
+	 * @return  SATFactory that produces SATSolver wrappers for the Plingeling solver
+	 */
+	public static final SATFactory plingeling(Integer threads, Boolean portfolio) {
+		
+		final List<String> opts = new ArrayList<String>(3);
+		if (threads!=null) {
+			if (threads < 1)
+				throw new IllegalArgumentException("Number of threads must be at least 1: numberOfThreads=" + threads);
+			opts.add("-t");
+			opts.add(threads.toString());
+		}
+		if (portfolio!=null && portfolio)
+			opts.add("-p");
+		
+		final String executable = findStaticLibrary("plingeling");
+		return externalFactory(executable==null ? "plingeling" : executable, 
+				null, opts.toArray(new String[opts.size()]));
+	
+	}
+	
+	/**
+	 * Searches the {@code java.library.path} for an executable with the given name. Returns a fully 
+	 * qualified path to the first found executable.  Otherwise returns null.
+	 * @return a fully qualified path to an executable with the given name, or null if no executable 
+	 * is found.
+	 */
+	private static String findStaticLibrary(String name) { 
+		final String[] dirs = System.getProperty("java.library.path").split(System.getProperty("path.separator"));
+		
+		for(int i = dirs.length-1; i >= 0; i--) {
+			final File file = new File(dirs[i]+File.separator+name);
+			if (file.canExecute())
+				return file.getAbsolutePath();
+		}
+		
+		return null;
+	}
 	
 	/**
 	 * Returns a SATFactory that produces instances of the specified
@@ -151,28 +240,43 @@ public abstract class SATFactory {
 	/**
 	 * Returns a SATFactory that produces SATSolver wrappers for the external
 	 * SAT solver specified by the executable parameter.  The solver's input
-	 * and output formats must conform to the SAT competition standards
-	 * (http://www.satcompetition.org/2004/format-solvers2004.html).  The solver
-	 * will be called with the specified options, and the given tempInput file name will
-	 * be used to store the generated CNF files.  If the tempOutput string is empty,
-	 * the solver specified by the executable string is assumed to write its output 
-	 * to standard out; otherwise, the
-	 * solver is assumed to write its output to the tempOutput file.  It is the caller's responsibility to 
-	 * delete the temporary file(s) when no longer needed.  External solvers are never incremental.
-	 * @return  SATFactory that produces interruptible SATSolver wrappers for the specified external
+	 * and output formats must conform to the 
+	 * <a href="http://www.satcompetition.org/2011/rules.pdf">SAT competition standards</a>.  The solver
+	 * will be called with the specified options, and it is expected to write properly formatted
+	 * output to standard out.  If the {@code cnf} string is non-null,  it will be 
+	 * used as the file name for generated CNF files by all solver instances that the factory generates.  
+	 * If {@code cnf} null, each solver instance will use an automatically generated temporary file, which 
+	 * will be deleted when the solver instance is garbage-collected. The {@code cnf} file, if provided, is not 
+	 * automatically deleted; it is the caller's responsibility to  delete it when no longer needed.  
+	 * External solvers are never incremental.
+	 * @return  SATFactory that produces SATSolver wrappers for the specified external
 	 * SAT solver
 	 */
-	public static final SATFactory externalFactory(final String executable, final String tempInput, final String tempOutput, final String... options) {
+	public static final SATFactory externalFactory(final String executable, final String cnf, final String... options) {
 		return new SATFactory() {
 
 			@Override
 			public SATSolver instance() {
-				return new ExternalSolver(executable, tempInput, tempOutput, options);
+				if (cnf != null) {
+					return new ExternalSolver(executable, cnf, false, options);
+				} else {
+					try {
+						return new ExternalSolver(executable, 
+								File.createTempFile("kodkod", String.valueOf(executable.hashCode())).getAbsolutePath(), 
+								true, options);
+					} catch (IOException e) {
+						throw new SATAbortedException("Could not create a temporary file.", e);
+					}
+				}
 			}
 			
 			@Override
 			public boolean incremental() {
 				return false;
+			}
+			
+			public String toString() {
+				return (new File(executable)).getName();
 			}
 		};
 	}
@@ -191,16 +295,6 @@ public abstract class SATFactory {
 	 * {@link SATProver SATProvers}.  Otherwise returns false.
 	 */
 	public boolean prover() {
-		return false;
-	}
-	
-	/**
-	 * Returns true if the solvers returned by this.instance() are 
-	 * {@link SATMinSolver SATMinSolvers}.  Otherwise returns false.
-	 * @return true if the solvers returned by this.instance() are
-	 * {@link SATMinSolver SATMinSolvers}.  Otherwise returns false.
-	 */
-	public boolean minimizer() { 
 		return false;
 	}
 	

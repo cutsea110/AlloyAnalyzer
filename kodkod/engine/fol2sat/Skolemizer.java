@@ -1,5 +1,5 @@
-/* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+/*
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -69,26 +69,26 @@ import kodkod.util.nodes.AnnotatedNode;
 
 /**
  * Skolemizes existential quantifiers, up to a given
- * number of nestings (within universal quantifiers). 
+ * number of nestings (within universal quantifiers).
  * @author Emina Torlak
  */
-abstract class Skolemizer extends AbstractReplacer {	
-	
+public abstract class Skolemizer extends AbstractReplacer {
+
 	/**
-	 * Skolemizes the given annotated formula using the given bounds and options.  If 
-	 * Options.trackFormulas is set and the formula is skolemizable, the resulting annotated
-	 * formula will contain transitive source information for each of its subformulas. 
-	 * Specifically, let f be the returned annotated formula, t be a descendeant of f.node, and
-	 * s a descendant of annotated.node from which t was derived.  Then, 
-	 * f.source[t] = annotated.source[s].  If options.trackFormulas is false, no source 
+	 * Skolemizes the given annotated formula using the given bounds and options.  If
+	 * Options.logTranslation is set and the formula is skolemizable, the resulting annotated
+	 * formula will contain transitive source information for each of its subformulas.
+	 * Specifically, let f be the returned annotated formula, t be a descendant of f.node, and
+	 * s a descendant of annotated.node from which t was derived.  Then,
+	 * f.source[t] = annotated.source[s].  If options.logTranslation is false, no source
 	 * information will be recorded (i.e. f.source[t] = t for all descendants t of f).
 	 * @ensures upper bound mappings for skolem constants, if any, are added to the bounds
 	 * @return the skolemized version of the given formula
-	 * @throws NullPointerException - any of the arguments are null
-	 * @throws IllegalArgumentException - some Relation & annotated.node.^children - bounds.relations
-	 * @throws UnsupportedOperationException - bounds is unmodifiable
+	 * @throws NullPointerException  any of the arguments are null
+	 * @throws IllegalArgumentException  some Relation & annotated.node.^children - bounds.relations
+	 * @throws UnsupportedOperationException  bounds is unmodifiable
 	 */
-	static AnnotatedNode<Formula> skolemize(final AnnotatedNode<Formula> annotated, Bounds bounds, Options options) {
+	public static AnnotatedNode<Formula> skolemize(final AnnotatedNode<Formula> annotated, Bounds bounds, Options options) {
 		if (options.logTranslation()>0) {
 			final Map<Node,Node> source = new IdentityHashMap<Node,Node>();
 			final Skolemizer r = new Skolemizer(annotated, bounds, options) {
@@ -109,7 +109,7 @@ abstract class Skolemizer extends AbstractReplacer {
 	}
 
 	/**
-	 * Contains info about an approximate bound for a 
+	 * Contains info about an approximate bound for a
 	 * non-skolemizable decl.
 	 * @specfield decl: Decl
 	 * @specfield upperBound: lone BooleanMatrix
@@ -151,16 +151,16 @@ abstract class Skolemizer extends AbstractReplacer {
 	private int skolemDepth;
 
 	/**
-	 * Constructs a skolem replacer from the given arguments. 
+	 * Constructs a skolem replacer from the given arguments.
 	 */
 	private Skolemizer(AnnotatedNode<Formula> annotated, Bounds bounds, Options options) {
 		super(annotated.sharedNodes());
 
 		// only cache intermediate computations for expressions with no free variables
 		// and formulas with no free variables and no quantified descendents
-		final AbstractDetector fvdetect = annotated.freeVariableDetector();
-		final AbstractDetector qdetect = annotated.quantifiedFormulaDetector();
 		for(Node n: annotated.sharedNodes()) {
+		    final AbstractDetector fvdetect = annotated.freeVariableDetector();
+		    final AbstractDetector qdetect = annotated.quantifiedFormulaDetector();
 			if (!(Boolean)n.accept(fvdetect)) {
 				if (!(n instanceof Formula) || !((Boolean)n.accept(qdetect)))
 					this.cache.put(n, null);
@@ -181,10 +181,10 @@ abstract class Skolemizer extends AbstractReplacer {
 	}
 
 	/**
-	 * Caches the given replacement for the specified node, if 
+	 * Caches the given replacement for the specified node, if
 	 * the node is a syntactically shared expression, int expression or declaration with
 	 * no free variables.  Otherwise does nothing.  The method returns
-	 * the replacement node.  
+	 * the replacement node.
 	 * @return replacement
 	 */
 	@Override
@@ -194,31 +194,31 @@ abstract class Skolemizer extends AbstractReplacer {
 		}
 		return replacement;
 	}
-	
+
 	/**
-	 * Records that the given node is the source of the 
+	 * Records that the given node is the source of the
 	 * specified formula, if this is a tracking skolemizer.  Otherwise does nothing.
 	 * This method is always called when the result of visiting a node n will result
 	 * in the creation of a formula f such that f != n.
 	 * @return f
-	 * @ensures Records that the given node is the source of the 
+	 * @ensures Records that the given node is the source of the
 	 * specified formula, if this is a tracking skolemizer.  Otherwise does nothing.
 	 */
-	protected Formula source(Formula f, Node n) { 
-		return f; 
+	protected Formula source(Formula f, Node n) {
+		return f;
 	}
-	
+
 	/*-------declarations---------*/
-	/** 
-	 * Visits the given decl's expression.  Note that we must not visit variables 
+	/**
+	 * Visits the given decl's expression.  Note that we must not visit variables
 	 * in case they are re-used.  For example, consider the formula
 	 * some x: X | all x: Y | F(x).  Since x bound by the existential quantifier
 	 * is going to be skolemized, if we visited the variable in the enclosed
 	 * declaration, we would get the skolem constant as a return value and
 	 * a ClassCastException would be thrown.
-	 * 
+	 *
 	 * @return { d: Declaration |  d.variable = decl.variable && d.multiplicity = decl.multiplicity &&
-	 *                             d.expression = decl.expression.accept(this) } 
+	 *                             d.expression = decl.expression.accept(this) }
 	 */
 	@Override
 	public final Decl visit(Decl decl) {
@@ -228,11 +228,11 @@ abstract class Skolemizer extends AbstractReplacer {
 		skolemDepth = -1; // can't skolemize inside a decl
 		final Expression expression = decl.expression().accept(this);
 		skolemDepth = oldDepth;
-		ret = (expression==decl.expression()) ? decl : decl.variable().declare(decl.multiplicity(), expression); 	
+		ret = (expression==decl.expression()) ? decl : decl.variable().declare(decl.multiplicity(), expression);
 		return cache(decl,ret);
 	}
 
-	/** 
+	/**
 	 * This method should be accessed only from the context of a non-skolemizable
 	 * node, because it  extends the replacement environment
 	 * with  identity mappings for the variables declared in the given decls.  To ensure
@@ -243,17 +243,17 @@ abstract class Skolemizer extends AbstractReplacer {
 	 * #(this.repEnv'.*parent - this.repEnv.*parent) = decls.size() &&
 	 * all v: decls.variable | this.repEnv'.lookup(v) = v
 	 * @requires this.skolemDepth < 0
-	 * @return { d: Decls | d.size = decls.size && 
-	 *                      all i: [0..d.size) | d.declarations[i] = decls.declarations[i].accept(this) } 
+	 * @return { d: Decls | d.size = decls.size &&
+	 *                      all i: [0..d.size) | d.declarations[i] = decls.declarations[i].accept(this) }
 	 */
-	public final  Decls visit(Decls decls) { 
+	public final  Decls visit(Decls decls) {
 		Decls ret = lookup(decls);
 		if (ret==null) {
 			Decls visitedDecls = null;
 			boolean allSame = true;
 			for(Decl decl : decls) {
 				Decls newDecl = visit(decl);
-				if (newDecl != decl) 
+				if (newDecl != decl)
 					allSame = false;
 				visitedDecls = (visitedDecls==null) ? newDecl : visitedDecls.and(newDecl);
 				repEnv = repEnv.extend(decl.variable(), decl.expression(), decl.variable());
@@ -270,19 +270,19 @@ abstract class Skolemizer extends AbstractReplacer {
 
 	/*-------expressions and intexpressions---------*/
 	/* INVARIANT:  whenever an expression or intexpression is visited, skolemDepth < 0 */
-	/** 
+	/**
 	 * Returns the binding for the given variable in the current replacement environment.
 	 * @return the binding for the given variable in the current replacement environment.
-	 * @throws UnboundLeafException - variable not bound in teh replacement environment.
+	 * @throws UnboundLeafException  variable not bound in teh replacement environment.
 	 */
 	@Override
-	public final Expression visit(Variable variable) { 
+	public final Expression visit(Variable variable) {
 		final Expression ret = repEnv.lookup(variable);
 		if (ret==null)
 			throw new UnboundLeafException("Unbound variable", variable);
 		return ret;
-	}	
-	
+	}
+
 	/**
 	 * @see kodkod.ast.visitor.AbstractReplacer#visit(kodkod.ast.Comprehension)
 	 */
@@ -294,7 +294,7 @@ abstract class Skolemizer extends AbstractReplacer {
 		final Decls decls = visit((Decls)expr.decls());
 		final Formula formula = expr.formula().accept(this);
 		ret = (decls==expr.decls() && formula==expr.formula()) ? expr : formula.comprehension(decls);
-		repEnv = oldRepEnv;		
+		repEnv = oldRepEnv;
 		return cache(expr,ret);
 	}
 	/**
@@ -303,7 +303,7 @@ abstract class Skolemizer extends AbstractReplacer {
 	@Override
 	public final IntExpression visit(SumExpression intExpr) {
 		IntExpression ret = lookup(intExpr);
-		if (ret!=null) return ret;	
+		if (ret!=null) return ret;
 		final Environment<Expression, Expression> oldRepEnv = repEnv; // skolemDepth < 0 at this point
 		final Decls decls  = visit((Decls)intExpr.decls());
 		final IntExpression expr = intExpr.intExpr().accept(this);
@@ -320,12 +320,12 @@ abstract class Skolemizer extends AbstractReplacer {
 	private final BooleanMatrix upperBound(Expression expr, Environment<BooleanMatrix, Expression> env) {
 		return FOL2BoolTranslator.approximate(annotate(expr), interpreter, env);
 	}
-	
+
 	/**
 	 * Adds a bound for the given skolem relation to
 	 * this.bounds, and returns the expression that should replace skolemDecl.variable in the final formula.
 	 * @requires skolem !in this.bounds.relations
-	 * @requires skolem.arity = nonSkolems.size() + skolemDecl.variable().arity() 
+	 * @requires skolem.arity = nonSkolems.size() + skolemDecl.variable().arity()
 	 * @ensures adds a sound upper bound for the given skolem relation to this.bounds
 	 * @return the expression that should replace skolemDecl.variable in the final formula
 	 */
@@ -353,27 +353,29 @@ abstract class Skolemizer extends AbstractReplacer {
 		bounds.bound(skolem, skolemBound);
 
 		return skolemExpr;
-	}	
-		
+	}
+
 	/**
 	 * Returns a formula that properly constrains the given skolem's domain.
 	 * @requires !nonSkolems.isEmpty()
 	 * @return a formula that properly constrains the given skolem's domain.
-	 */ 
-	private Formula domainConstraint(Decl skolemDecl, Relation skolem) { 
+	 */
+	private Formula domainConstraint(Decl skolemDecl, Relation skolem) {
 		final Iterator<DeclInfo> itr = nonSkolems.iterator();
-		Decls rangeDecls = itr.next().decl;
+		Decls rangeDecls = null;
 		while(itr.hasNext()) {
-			rangeDecls = rangeDecls.and(itr.next().decl);
+		    Decl d = itr.next().decl;
+		    Decl dd = d.variable().oneOf(d.expression());
+			rangeDecls = rangeDecls != null ? rangeDecls.and(dd) : dd;
 		}
 //		System.out.println(skolemDecl.expression());
 		Expression skolemDomain = skolem;
-		for(int i = 0, max = skolemDecl.variable().arity(); i < max; i++) { 
+		for(int i = 0, max = skolemDecl.variable().arity(); i < max; i++) {
 			skolemDomain = skolemDomain.join(Expression.UNIV);
 		}
-		return skolemDomain.in(Formula.TRUE.comprehension(rangeDecls));	
+		return skolemDomain.in(Formula.TRUE.comprehension(rangeDecls));
 	}
-	
+
 	/**
 	 * Skolemizes the given formula, if possible, otherwise returns the result
 	 * of replacing its free variables according to the current replacement environment.
@@ -382,66 +384,69 @@ abstract class Skolemizer extends AbstractReplacer {
 	public final Formula visit(QuantifiedFormula qf) {
 		Formula ret = lookup(qf);
 		if (ret!=null) return ret;
-		
-		final Environment<Expression, Expression> oldRepEnv = repEnv;	
+
+		final Environment<Expression, Expression> oldRepEnv = repEnv;
 		final Quantifier quant = qf.quantifier();
 		final Decls decls = qf.decls();
-		
+
 		if (skolemDepth>=0 && (negated && quant==ALL || !negated && quant==SOME)) { // skolemizable formula
 			final List<Formula> rangeConstraints = new LinkedList<Formula>();
 			final List<Formula> domConstraints = new LinkedList<Formula>();
-			
-			for(Decl decl : decls) {	
+
+			for(Decl decl : decls) {
 				final Decl skolemDecl = visit(decl);
-				
-				final Relation skolem = Relation.nary("$"+ skolemDecl.variable().name(), nonSkolems.size() + skolemDecl.variable().arity());
+
+				Variable skVar = skolemDecl.variable();
+                final Relation skolem = Relation.skolem("$"+ skVar.name(), nonSkolems.size() + skVar.arity(), skVar, skolemDecl.expression(), quant);
 				reporter.skolemizing(decl, skolem, nonSkolemsView);
-				
+
 				final Expression skolemExpr = skolemExpr(skolemDecl, skolem);
-				
+
 				final Multiplicity mult = decl.multiplicity();
 				rangeConstraints.add(source(skolemExpr.in(skolemDecl.expression()), decl));
-				if (mult!=Multiplicity.SET) { 
+				if (mult!=Multiplicity.SET) {
 					rangeConstraints.add(source(skolemExpr.apply(mult), decl));
 				}
 
 				if (!nonSkolems.isEmpty())
 					domConstraints.add(source(domainConstraint(skolemDecl, skolem), decl));
-				
+
 				repEnv = repEnv.extend(decl.variable(), decl.expression(), skolemExpr);
 			}
-		
+
 			ret = source(Formula.and(rangeConstraints), decls).compose(negated ? IMPLIES : AND, qf.formula().accept(this));
-			
-			if (!domConstraints.isEmpty()) 
+
+			if (!domConstraints.isEmpty())
 				topSkolemConstraints.add(source(Formula.and(domConstraints), decls));
-			
+
 		} else { // non-skolemizable formula
-		
+
 			final Decls newDecls = visit((Decls)qf.decls());
 			if (skolemDepth>=nonSkolems.size()+newDecls.size()) { // could skolemize below
 				for(Decl d: newDecls) { nonSkolems.add(new DeclInfo(d)); }
-				final Formula formula = qf.formula().accept(this);
-				ret = ((newDecls==decls && formula==qf.formula()) ? qf : formula.quantify(quant, newDecls));
+				final Formula domain = qf.domain().accept(this);
+				final Formula body = qf.body().accept(this);
+				ret = ((newDecls==decls && domain==qf.domain() && body==qf.body()) ? qf : body.quantify(quant, newDecls, domain));
 				for(int i = newDecls.size(); i > 0; i--) { nonSkolems.remove(nonSkolems.size()-1); }
 			} else { // can't skolemize below
 				final int oldDepth = skolemDepth;
-				skolemDepth = -1; 
-				final Formula formula = qf.formula().accept(this);
-				ret = ((newDecls==decls && formula==qf.formula()) ? qf : formula.quantify(quant, newDecls));
+				skolemDepth = -1;
+				final Formula domain = qf.domain().accept(this);
+				final Formula body = qf.body().accept(this);
+				ret = ((newDecls==decls && domain==qf.domain() && body==qf.body()) ? qf : body.quantify(quant, newDecls, domain));
 				skolemDepth = oldDepth;
-			}				
-		}	
-		
+			}
+		}
+
 		repEnv = oldRepEnv;
-		if (repEnv.isEmpty() && !topSkolemConstraints.isEmpty()) { 
+		if (repEnv.isEmpty() && !topSkolemConstraints.isEmpty()) {
 			ret = source(Formula.and(topSkolemConstraints), qf).compose(negated ? IMPLIES : AND, ret);
 		}
 		return source(cache(qf,ret), qf);
 	}
 
-	/** 
-	 * Calls not.formula.accept(this) after flipping the negation flag and returns the result. 
+	/**
+	 * Calls not.formula.accept(this) after flipping the negation flag and returns the result.
 	 * @see kodkod.ast.visitor.AbstractReplacer#visit(kodkod.ast.NotFormula)
 	 **/
 	public final Formula visit(NotFormula not) {
@@ -450,7 +455,7 @@ abstract class Skolemizer extends AbstractReplacer {
 		negated = !negated; // flip the negation flag
 		final Formula retChild = not.formula().accept(this);
 		negated = !negated;
-		return retChild==not.formula() ? cache(not,not) : source(cache(not, retChild.not()), not);			
+		return retChild==not.formula() ? cache(not,not) : source(cache(not, retChild.not()), not);
 	}
 
 	/**
@@ -460,7 +465,7 @@ abstract class Skolemizer extends AbstractReplacer {
 	 */
 	public final Formula visit(BinaryFormula bf) {
 		Formula ret = lookup(bf);
-		if (ret!=null) return ret;			
+		if (ret!=null) return ret;
 		final FormulaOperator op = bf.op();
 		final int oldDepth = skolemDepth;
 		if (op==IFF || (negated && op==AND) || (!negated && (op==OR || op==IMPLIES))) { // cannot skolemize in these cases
@@ -488,34 +493,34 @@ abstract class Skolemizer extends AbstractReplacer {
 	 */
 	public final Formula visit(NaryFormula bf) {
 		Formula ret = lookup(bf);
-		if (ret!=null) return ret;			
-		
+		if (ret!=null) return ret;
+
 		final int oldDepth = skolemDepth;
 		final FormulaOperator op = bf.op();
-		
-		switch(op) { 
+
+		switch(op) {
 		case AND : if (negated)  skolemDepth = -1; break;
 		case OR  : if (!negated) skolemDepth = -1; break;
 		default  : throw new IllegalArgumentException("Unknown nary operator: " + op);
 		}
-		
+
 		final Formula[] visited = new Formula[bf.size()];
 		boolean allSame = true;
-		for(int i = 0; i < visited.length; i++) { 
+		for(int i = 0; i < visited.length; i++) {
 			final Formula child = bf.child(i);
 			visited[i] = child.accept(this);
 			allSame = allSame && (child==visited[i]);
 		}
 		ret = allSame ? bf : Formula.compose(op, visited);
-		
+
 		skolemDepth = oldDepth;
-		
+
 		return source(cache(bf,ret),bf);
 	}
 
-	/** 
-	 * Calls super.visit(icf) after disabling skolemization and returns the result. 
-	 * @return super.visit(icf) 
+	/**
+	 * Calls super.visit(icf) after disabling skolemization and returns the result.
+	 * @return super.visit(icf)
 	 **/
 	public final Formula visit(IntComparisonFormula icf) {
 		final int oldDepth = skolemDepth;
@@ -525,9 +530,9 @@ abstract class Skolemizer extends AbstractReplacer {
 		return source(ret,icf);
 	}
 
-	/** 
-	 * Calls super.visit(cf) after disabling skolemization and returns the result. 
-	 * @return super.visit(cf) 
+	/**
+	 * Calls super.visit(cf) after disabling skolemization and returns the result.
+	 * @return super.visit(cf)
 	 **/
 	public final Formula visit(ComparisonFormula cf) {
 		final int oldDepth = skolemDepth;
@@ -537,9 +542,9 @@ abstract class Skolemizer extends AbstractReplacer {
 		return source(ret,cf);
 	}
 
-	/** 
-	 * Calls super.visit(mf) after disabling skolemization and returns the result. 
-	 * @return super.visit(mf) 
+	/**
+	 * Calls super.visit(mf) after disabling skolemization and returns the result.
+	 * @return super.visit(mf)
 	 **/
 	public final Formula visit(MultiplicityFormula mf) {
 		final int oldDepth = skolemDepth;
@@ -549,9 +554,9 @@ abstract class Skolemizer extends AbstractReplacer {
 		return source(ret,mf);
 	}
 
-	/** 
-	 * Calls super.visit(pred) after disabling skolemization and returns the result. 
-	 * @return super.visit(pred) 
+	/**
+	 * Calls super.visit(pred) after disabling skolemization and returns the result.
+	 * @return super.visit(pred)
 	 **/
 	public final Formula visit(RelationPredicate pred) {
 		final int oldDepth = skolemDepth;

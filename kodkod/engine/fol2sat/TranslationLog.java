@@ -1,5 +1,5 @@
 /* 
- * Kodkod -- Copyright (c) 2005-2011, Emina Torlak
+ * Kodkod -- Copyright (c) 2005-present, Emina Torlak
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,17 +25,16 @@ import java.util.Iterator;
 import java.util.Set;
 
 import kodkod.ast.Formula;
-import kodkod.engine.Solver;
 import kodkod.engine.config.Options;
 import kodkod.instance.Bounds;
 
 /**
  * A log of the translations of the descendants of a given formula that 
  * are either formulas or that desugar to formulas.
- * @specfield originalFormula: Formula // the {@linkplain Solver#solve(Formula, kodkod.instance.Bounds) original} formula, provided by the user
- * @specfield originalBounds: Bounds // the {@linkplain Solver#solve(Formula, kodkod.instance.Bounds) original} bounds, provided by the user
- * @specfield formula: Formula // desugaring of this.formula that was translated
- * @specfield bounds: Bounds // translation bounds
+ * @specfield originalFormula: Formula // the original formula, as constructed by client
+ * @specfield originalBounds: Bounds // the original bounds, as constructed by client
+ * @specfield formula: Formula // optimization of this.originalFormula that was used for translation
+ * @specfield bounds: Bounds // optimization of this.originalBounds that was used for translation
  * @specfield records: set TranslationRecord
  * @specfield replay: [0..#records) one->one records // replay order -- i.e. the order in the which records were added to the log
  * @invariant all r: records | r.node in formula.*children
@@ -108,7 +107,7 @@ public abstract class TranslationLog {
 //	 * Compresses this translation log (optional operation) by eliminating
 //	 * redundant records.
 //	 * @ensures all r: this.records | one r': this.records' | r.node = r'.node && r.literal = r'.literal && r.env.equals(r'.env)
-//	 * @throws UnsupportedOperationException - this log does not support compression
+//	 * @throws UnsupportedOperationException  this log does not support compression
 //	 */
 //	public abstract void compress();
 }
