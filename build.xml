@@ -3,6 +3,7 @@
     <delete>
       <fileset dir="edu" includes="**/*.class"/>
       <fileset dir="java" includes="**/*.class"/>
+      <fileset dir="java_cup" includes="**/*.class"/>
     </delete>
     <delete dir="dist"/>
   </target>
@@ -10,6 +11,7 @@
   <path id="src.path">
     <pathelement location="edu" />
     <pathelement location="java" />
+    <pathelement location="java_cup" />
   </path>
 
   <target name="build">
@@ -20,7 +22,7 @@
 
   <target name="dist" depends="build">
     <mkdir dir="dist"/>
-    <jar destfile="dist/alloy4.2.jar" basedir="." excludes="dist/** build/** tmp/**" manifest="META-INF/MANIFEST.MF"/>
+    <jar destfile="dist/alloy4.2.jar" basedir="." excludes="dist/** build/**" manifest="META-INF/MANIFEST.MF"/>
   </target>
 
   <target name="all" depends="dist"/>
