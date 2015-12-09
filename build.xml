@@ -2,17 +2,25 @@
   <target name="clean">
     <delete>
       <fileset dir="edu" includes="**/*.class"/>
+      <fileset dir="java" includes="**/*.class"/>
     </delete>
     <delete dir="dist"/>
   </target>
+  
+  <path id="src.path">
+    <pathelement location="edu" />
+    <pathelement location="java" />
+  </path>
 
   <target name="build">
-    <javac srcdir="edu" debug="true" includeAntRuntime="false"/>
+    <javac debug="true" includeAntRuntime="false" classpath=".:kodkod.jar">
+      <src refid="src.path" />
+    </javac>
   </target>
 
   <target name="dist" depends="build">
     <mkdir dir="dist"/>
-    <jar destfile="dist/alloy4.2.jar" basedir="." excludes="dist/**" manifest="META-INF/MANIFEST.MF"/>
+    <jar destfile="dist/alloy4.2.jar" basedir="." excludes="dist/** build/** tmp/**" manifest="META-INF/MANIFEST.MF"/>
   </target>
 
   <target name="all" depends="dist"/>

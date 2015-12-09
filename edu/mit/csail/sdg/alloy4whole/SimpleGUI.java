@@ -113,10 +113,6 @@ import javax.swing.text.html.HTMLDocument;
 
 import kodkod.engine.fol2sat.HigherOrderDeclException;
 
-import com.apple.eawt.Application;
-import com.apple.eawt.ApplicationAdapter;
-import com.apple.eawt.ApplicationEvent;
-
 import edu.mit.csail.sdg.alloy4.A4Preferences;
 import edu.mit.csail.sdg.alloy4.A4Preferences.BooleanPref;
 import edu.mit.csail.sdg.alloy4.A4Preferences.ChoicePref;
@@ -129,7 +125,6 @@ import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorFatal;
 import edu.mit.csail.sdg.alloy4.ErrorType;
 import edu.mit.csail.sdg.alloy4.Listener;
-import edu.mit.csail.sdg.alloy4.MacUtil;
 import edu.mit.csail.sdg.alloy4.MailBug;
 import edu.mit.csail.sdg.alloy4.OurAntiAlias;
 import edu.mit.csail.sdg.alloy4.OurBorder;
@@ -1531,9 +1526,6 @@ public final class SimpleGUI implements ComponentListener, Listener {
     /** The constructor; this method will be called by the AWT event thread, using the "invokeLater" method. */
     private SimpleGUI (final String[] args) {
 
-        // Register an exception handler for uncaught exceptions
-        MailBug.setup();
-
         // Enable better look-and-feel
         if (Util.onMac() || Util.onWindows()) {
            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Alloy");
@@ -1541,15 +1533,6 @@ public final class SimpleGUI implements ComponentListener, Listener {
            System.setProperty("com.apple.mrj.application.live-resize","true");
            System.setProperty("com.apple.macos.useScreenMenuBar","true");
            System.setProperty("apple.laf.useScreenMenuBar","true");
-        }
-        if (Util.onMac()) {
-           Application.getApplication().addPreferencesMenuItem();
-           Application.getApplication().addAboutMenuItem();
-           Application.getApplication().addApplicationListener(new ApplicationAdapter() {
-              @Override public void handleAbout(ApplicationEvent ae)       { doAbout(); }
-              @Override public void handlePreferences(ApplicationEvent ae) { doPreferences(); }
-              @Override public void handleQuit(ApplicationEvent arg0)      { doQuit(); }
-           });
         }
 
         doLookAndFeel();
@@ -1733,7 +1716,7 @@ public final class SimpleGUI implements ComponentListener, Listener {
         // If on Mac, then register an application listener
         try {
             wrap = true;
-            if (Util.onMac()) MacUtil.registerApplicationListener(doShow(), doAbout(), doOpenFile(""), doQuit());
+            //if (Util.onMac()) MacUtil.registerApplicationListener(doShow(), doAbout(), doOpenFile(""), doQuit());
         } finally {
             wrap = false;
         }
