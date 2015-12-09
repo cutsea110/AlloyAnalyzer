@@ -270,7 +270,7 @@ public final class A4Solution {
         bounds.boundExactly(KK_STRING, this.stringBounds);
         int sym = (expected==1 ? 0 : opt.symmetry);
         solver = new Solver();
-        solver.options().setNoOverflow(opt.noOverflow);
+        //solver.options().setNoOverflow(opt.noOverflow);
         //solver.options().setFlatten(false); // added for now, since multiplication and division circuit takes forever to flatten
         if (opt.solver.external()!=null) {
             String ext = opt.solver.external();
@@ -287,8 +287,6 @@ public final class A4Solution {
             solver.options().setSolver(SATFactory.plingeling(4, null));
         } else if (opt.solver.equals(A4Options.SatSolver.GlucoseJNI)) {
             solver.options().setSolver(SATFactory.Glucose);
-        } else if (opt.solver.equals(A4Options.SatSolver.CryptoMiniSatJNI)) {
-            solver.options().setSolver(SATFactory.CryptoMiniSat);
         } else if (opt.solver.equals(A4Options.SatSolver.MiniSatJNI)) {
             solver.options().setSolver(SATFactory.MiniSat);
         } else if (opt.solver.equals(A4Options.SatSolver.MiniSatProverJNI)) {
@@ -612,7 +610,7 @@ public final class A4Solution {
            if (expr.ambiguous && !expr.errors.isEmpty()) expr = expr.resolve(expr.type(), null);
            if (!expr.errors.isEmpty()) throw expr.errors.pick();
            Object result = TranslateAlloyToKodkod.alloy2kodkod(this, expr);
-           if (result instanceof IntExpression) return eval.evaluate((IntExpression)result) + (eval.wasOverflow() ? " (OF)" : "");
+           if (result instanceof IntExpression) return eval.evaluate((IntExpression)result);
            if (result instanceof Formula) return eval.evaluate((Formula)result);
            if (result instanceof Expression) return new A4TupleSet(eval.evaluate((Expression)result), this);
            throw new ErrorFatal("Unknown internal error encountered in the evaluator.");

@@ -35,7 +35,6 @@ import kodkod.ast.Decl;
 import kodkod.ast.Decls;
 import kodkod.ast.ExprToIntCast;
 import kodkod.ast.Expression;
-import kodkod.ast.FixFormula;
 import kodkod.ast.Formula;
 import kodkod.ast.IfExpression;
 import kodkod.ast.IfIntExpression;
@@ -100,7 +99,6 @@ public final class TranslateKodkodToJava implements VoidVisitor {
             public Integer visit(IfIntExpression x)       { return 1 + max(x.condition().accept(this), x.thenExpr().accept(this), x.elseExpr().accept(this)); }
             public Integer visit(SumExpression x)         { return 1 + max(x.decls().accept(this), x.intExpr().accept(this)); }
             public Integer visit(QuantifiedFormula x)     { return 1 + max(x.decls().accept(this), x.formula().accept(this)); }
-            public Integer visit(FixFormula x)            { return 1 + max(x.condition().accept(this), x.formula().accept(this)); }
             public Integer visit(Comprehension x)         { return 1 + max(x.decls().accept(this), x.formula().accept(this)); }
             public Integer visit(Decls x) {
                 int max = 0, n = x.size();
@@ -336,7 +334,6 @@ public final class TranslateKodkodToJava implements VoidVisitor {
         String left=make(x.left());
         String right=make(x.right());
         switch(x.op()) {
-           case NEQ: file.printf("Formula %s=%s.neq(%s);%n", newname, left, right); break;
            case EQ: file.printf("Formula %s=%s.eq(%s);%n", newname, left, right); break;
            case GT: file.printf("Formula %s=%s.gt(%s);%n", newname, left, right); break;
            case GTE: file.printf("Formula %s=%s.gte(%s);%n", newname, left, right); break;
@@ -506,14 +503,6 @@ public final class TranslateKodkodToJava implements VoidVisitor {
            case SOME: file.printf("Formula %s=%s.forSome(%s);%n",newname,f,d); break;
            default: throw new RuntimeException("Unknown kodkod quantifier \""+x.quantifier()+"\" encountered");
         }
-    }
-
-    /** {@inheritDoc} */
-    public void visit(FixFormula x) {
-        String newname=makename(x); if (newname==null) return;
-        String f=make(x.formula());
-        String c=make(x.condition());
-        file.printf("Formula %s=%s.fix(%s);%n", newname, f, c);
     }
 
     /** {@inheritDoc} */
