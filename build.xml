@@ -15,7 +15,7 @@
   </path>
 
   <target name="build">
-    <javac debug="true" includeAntRuntime="false" classpath=".:kodkod.jar">
+    <javac debug="true" includeAntRuntime="false" classpath=".">
       <src refid="src.path" />
     </javac>
   </target>
